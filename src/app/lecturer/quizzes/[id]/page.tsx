@@ -9,6 +9,7 @@ import {
   type Question,
 } from "@/lib/types";
 import QuizBuilder from "../QuizBuilder";
+import HostLiveButton from "./HostLiveButton";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function QuizDetailPage({
             <span className="font-semibold">{quiz.status}</span>
           </p>
         </div>
+        <HostLiveButton quizId={quiz.id} disabled={selectedIds.length === 0} />
       </header>
 
       <QuizBuilder

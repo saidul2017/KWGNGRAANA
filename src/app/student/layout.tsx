@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 
 const NAV = [
   { href: "/student", label: "Beranda", icon: "🏠" },
+  { href: "/student/live", label: "Live Kahoot", icon: "🎮" },
   { href: "/student/practice", label: "Latihan Mandiri", icon: "🎯" },
   { href: "/student/quizzes", label: "Kuis & UAS", icon: "🏆" },
   { href: "/student/chatbot", label: "Chatbot PKn", icon: "💬" },

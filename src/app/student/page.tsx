@@ -45,7 +45,20 @@ export default async function StudentHome({
         </p>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2">
+        <Link href="/student/live" className="card border-2 border-rose-200 hover:shadow-lg transition group bg-gradient-to-br from-rose-50 to-amber-50">
+          <div className="text-3xl">🎮</div>
+          <h2 className="mt-2 font-semibold group-hover:text-rose-700">Gabung Sesi Live Kahoot</h2>
+          <p className="text-sm text-slate-600">Masukkan PIN dari layar dosen dan ikut bermain langsung di kelas.</p>
+        </Link>
+        <Link href="/student/chatbot" className="card hover:shadow-md transition group">
+          <div className="text-3xl">💬</div>
+          <h2 className="mt-2 font-semibold group-hover:text-brand-700">Chatbot PKn</h2>
+          <p className="text-sm text-slate-600">Tanya seputar Pancasila, UUD 1945, Demokrasi.</p>
+        </Link>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
         <Link href="/student/practice" className="card hover:shadow-md transition group">
           <div className="text-3xl">🎯</div>
           <h2 className="mt-2 font-semibold group-hover:text-brand-700">Latihan Mandiri</h2>
@@ -55,11 +68,6 @@ export default async function StudentHome({
           <div className="text-3xl">🏆</div>
           <h2 className="mt-2 font-semibold group-hover:text-brand-700">Kuis &amp; UAS</h2>
           <p className="text-sm text-slate-600">{quizCount?.c ?? 0} kuis sedang aktif.</p>
-        </Link>
-        <Link href="/student/chatbot" className="card hover:shadow-md transition group">
-          <div className="text-3xl">💬</div>
-          <h2 className="mt-2 font-semibold group-hover:text-brand-700">Chatbot PKn</h2>
-          <p className="text-sm text-slate-600">Tanya seputar Pancasila, UUD 1945, Demokrasi.</p>
         </Link>
       </section>
 

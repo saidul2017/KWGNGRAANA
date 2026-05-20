@@ -62,21 +62,29 @@ export default async function LecturerResultsPage({
           <h1 className="text-2xl font-bold">📈 Nilai Kelas</h1>
           <p className="text-sm text-slate-600">Leaderboard &amp; rekap pengerjaan mahasiswa.</p>
         </div>
-        <form className="flex gap-2">
-          <select
-            name="quizId"
-            defaultValue={searchParams?.quizId ?? ""}
-            className="input max-w-[300px]"
+        <div className="flex items-end gap-2">
+          <form className="flex gap-2">
+            <select
+              name="quizId"
+              defaultValue={searchParams?.quizId ?? ""}
+              className="input max-w-[300px]"
+            >
+              <option value="">Semua Kuis</option>
+              {quizzes.map((q) => (
+                <option key={q.id} value={q.id}>
+                  [{q.kind.toUpperCase()}] {q.title}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="btn-primary">Filter</button>
+          </form>
+          <a
+            href={`/api/lecturer/export${searchParams?.quizId ? `?quizId=${searchParams.quizId}` : ""}`}
+            className="btn-primary bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500"
           >
-            <option value="">Semua Kuis</option>
-            {quizzes.map((q) => (
-              <option key={q.id} value={q.id}>
-                [{q.kind.toUpperCase()}] {q.title}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn-primary">Filter</button>
-        </form>
+            📥 Ekspor Excel
+          </a>
+        </div>
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
