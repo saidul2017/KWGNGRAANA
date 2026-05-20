@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Secret dummy untuk lulus validasi build (tidak dipakai di runtime CI).
+      SESSION_PASSWORD: ci_dummy_secret_minimum_32_chars_for_build_only_xxx
+      DATABASE_PATH: ./data/kwgn.db
+      DEFAULT_LECTURER_EMAIL: dosen@kwgn.id
+      DEFAULT_LECTURER_NAME: Dosen CI
+      DEFAULT_LECTURER_PASSWORD: ci_password_only
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Init DB (smoke test schema)
+        run: |
+          mkdir -p data
+          npm run db:init
+
+      - name: Build Next.js
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -f .next/standalone/server.js || (echo "Standalone server.js missing"; exit 1)
+          echo "✓ Build artifacts OK"
+
+  docker:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: kwgn-learning-hub:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

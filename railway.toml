@@ -1,0 +1,26 @@
+# Konfigurasi deploy ke Railway (https://railway.app)
+# 1. Sign-up Railway (login dengan GitHub)
+# 2. New Project → Deploy from GitHub Repo → pilih KWGNGRAANA
+# 3. Railway auto-deteksi Dockerfile. Tunggu build pertama selesai.
+# 4. Variables tab → tambahkan environment:
+#      SESSION_PASSWORD = (hasil dari `openssl rand -base64 48`)
+#      DEFAULT_LECTURER_PASSWORD = (password kuat baru)
+#      GEMINI_API_KEY = (key dari aistudio.google.com/apikey)
+#      SEED_ON_START = 1   ← sekali saja saat first deploy
+# 5. Volumes tab → New Volume → Mount Path = /app/data → ukuran 1 GB cukup
+# 6. Deployments → trigger redeploy. App live di domain *.up.railway.app
+# 7. Setelah seed jalan sukses, set SEED_ON_START = 0 dan redeploy.
+#
+# Setiap `git push` ke main → Railway otomatis build & deploy.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+# numReplicas WAJIB 1 karena: SQLite file lokal + in-memory live store + rate-limit.
+numReplicas = 1

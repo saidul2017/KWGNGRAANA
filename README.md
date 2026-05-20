@@ -72,45 +72,87 @@ npm run start
 
 ## 🌐 Deployment
 
-### ✅ Direkomendasikan: VPS / kontainer dengan disk persisten
+### 🚀 Pilihan 1: Railway (rekomendasi · paling mudah)
 
-Karena aplikasi memakai SQLite (file lokal) dan in-memory session untuk
-Live Kahoot, **deploy yang ideal adalah server tunggal dengan disk persisten**:
+Railway punya **persistent disk** + auto-deploy dari GitHub + free tier.
 
-- **VPS Linux** (DigitalOcean, Hetzner, AWS Lightsail, dsb.) — paling sederhana
-- **Docker** dengan volume mount untuk `data/`
-- **Cloud Run** dengan persistent disk
-- **Komputer kampus / NUC** untuk pemakaian internal
+1. Sign-up di [railway.app](https://railway.app) (login dengan akun GitHub Anda)
+2. **New Project → Deploy from GitHub Repo → pilih `KWGNGRAANA`**
+3. Railway otomatis mendeteksi `Dockerfile` & `railway.toml`. Tunggu build pertama.
+4. Tab **Variables** — tambahkan environment ini:
+   ```
+   SESSION_PASSWORD=<hasil dari `openssl rand -base64 48`>
+   DEFAULT_LECTURER_PASSWORD=<password kuat baru>
+   GEMINI_API_KEY=<rotasi key di aistudio.google.com/apikey>
+   SEED_ON_START=1                  ← sekali saja saat first deploy
+   ```
+5. Tab **Volumes → New Volume** → mount path `/app/data`, ukuran `1 GB`.
+6. **Deployments → Redeploy**. App live di domain `*.up.railway.app` ✨
+7. Setelah seed berhasil (cek log), set `SEED_ON_START=0` dan redeploy.
+
+Setiap `git push` ke `main` akan **auto-build & deploy** di Railway.
+
+### 🐳 Pilihan 2: VPS / Docker (full kontrol)
+
+Untuk VPS (DigitalOcean, Hetzner, Lightsail) atau server kampus:
 
 ```bash
-# Production env yang wajib diset:
-SESSION_PASSWORD=<32+ karakter random>
-DATABASE_PATH=/path/persistent/kwgn.db
-GEMINI_API_KEY=<key Google AI>
-NODE_ENV=production
+git clone https://github.com/saidul2017/KWGNGRAANA.git
+cd KWGNGRAANA
+
+# Salin & isi env (TIDAK akan ter-commit)
+cp .env.example .env
+# Edit .env dengan nilai produksi:
+#   SESSION_PASSWORD=...   (openssl rand -base64 48)
+#   GEMINI_API_KEY=...
+#   DEFAULT_LECTURER_PASSWORD=...
+#   SEED_ON_START=1        ← sekali untuk seed pertama
+
+docker compose up -d --build
+
+# Cek log pertama
+docker compose logs -f app
+
+# Aplikasi tersedia di http://YOUR_SERVER:3000
+# Untuk HTTPS, taruh di belakang Nginx/Caddy/Traefik (lihat docs masing-masing)
+
+# Setelah seed sukses, ubah SEED_ON_START=0 di .env, lalu:
+docker compose up -d
 ```
 
-### ⚠️ Tidak direkomendasikan: Vercel / Netlify / serverless
+**Update aplikasi:** `git pull && docker compose up -d --build`
+**Backup DB:** `docker compose exec app cp /app/data/kwgn.db /app/data/backup-$(date +%F).db`
 
-Penyebab:
+### ⚙️ Pilihan 3: Render (alternatif Railway)
 
-1. **SQLite file tidak persisten** — filesystem serverless read-only/ephemeral.
-   Setiap deploy/cold start, data hilang.
-2. **In-memory live session hilang per cold start** — sesi Live Kahoot akan
-   putus setiap fungsi serverless restart.
-3. **Stateful counter rate-limit** in-memory tidak akurat lintas instance.
+[render.com](https://render.com) baca `render.yaml` otomatis:
 
-**Bila tetap ingin serverless**, ganti:
-- SQLite → **Turso** (`@libsql/client` sudah kompatibel; ubah `DATABASE_PATH` ke URL)
-  atau **Vercel Postgres** / **Neon**
-- In-memory live store → **Redis** (Upstash) atau **Supabase Realtime**
-- In-memory rate limit → **Upstash Ratelimit**
+1. Sign-up Render dengan GitHub
+2. Dashboard → **New → Blueprint** → connect repo
+3. Isi env yang ditandai `sync: false` saat prompt:
+   `SESSION_PASSWORD`, `DEFAULT_LECTURER_PASSWORD`, `GEMINI_API_KEY`
+4. Klik **Apply**. Render build & deploy otomatis.
+5. Pasca-live, tab **Shell** → jalankan sekali:
+   ```
+   node node_modules/tsx/dist/cli.mjs scripts/seed.ts
+   ```
+   untuk seed dosen + 43 mahasiswa + soal demo.
+
+> Render free tier **tidak punya disk persisten** — wajib pakai paket `starter` ($7/bln) untuk SQLite.
+
+### ⚠️ Tidak direkomendasikan: Vercel / Netlify
+
+SQLite file tidak persisten di serverless filesystem. Bila ngotot pakai Vercel:
+- Migrasi DB ke **Turso** (`@libsql/client` sudah kompatibel — ubah `DATABASE_PATH`
+  ke URL Turso seperti `libsql://your-db-xxx.turso.io?authToken=...`)
+- In-memory live store + rate-limit ganti ke **Upstash Redis**
 
 ### 🔍 Health Check
 
-`GET /api/health` mengembalikan status DB dan apakah LLM aktif. Cocok untuk:
-- Liveness probe load balancer
-- Uptime monitor (UptimeRobot, Better Stack, dsb.)
+`GET /api/health` mengembalikan status DB & LLM. Cocok untuk:
+- Liveness probe Docker (sudah dikonfigurasi di `Dockerfile`)
+- Health check Railway/Render (sudah dikonfigurasi di config)
+- Uptime monitor eksternal: UptimeRobot, Better Stack, dsb.
 
 ## 🧠 Penilaian Otomatis
 
