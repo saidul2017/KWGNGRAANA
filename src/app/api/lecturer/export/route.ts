@@ -138,6 +138,40 @@ export async function GET(req: Request) {
   );
   XLSX.utils.book_append_sheet(wb, sheet3, "Per Kuis");
 
+  // Sheet 4: Per Kelompok
+  const perGroup = await all<{
+    group_name: string;
+    member_count: number;
+    active_members: number;
+    total_attempts: number;
+    total_score: number;
+    avg_score: number;
+  }>(
+    `SELECT g.name AS group_name,
+            (SELECT COUNT(*) FROM users u WHERE u.group_id = g.id AND u.role='student') AS member_count,
+            COUNT(DISTINCT a.user_id) AS active_members,
+            COUNT(a.id) AS total_attempts,
+            COALESCE(SUM(a.total_score), 0) AS total_score,
+            COALESCE(ROUND(AVG(a.total_score), 0), 0) AS avg_score
+     FROM groups g
+     LEFT JOIN attempts a ON a.group_id = g.id AND a.status='completed' ${filterSql.replace(/^AND/, "AND")}
+     GROUP BY g.id, g.name
+     ORDER BY avg_score DESC`,
+    params
+  );
+  const sheet4 = XLSX.utils.json_to_sheet(
+    perGroup.map((r, i) => ({
+      "Peringkat": i + 1,
+      "Kelompok": r.group_name,
+      "Anggota Aktif": r.active_members,
+      "Total Anggota": r.member_count,
+      "Jumlah Pengerjaan": r.total_attempts,
+      "Total Skor": r.total_score,
+      "Skor Rata-rata": r.avg_score,
+    }))
+  );
+  XLSX.utils.book_append_sheet(wb, sheet4, "Per Kelompok");
+
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   const ts = new Date().toISOString().slice(0, 10);
   const filename = quizId

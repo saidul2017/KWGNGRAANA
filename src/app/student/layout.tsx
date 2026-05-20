@@ -9,6 +9,7 @@ const NAV = [
   { href: "/student/quizzes", label: "Kuis & UAS", icon: "🏆" },
   { href: "/student/chatbot", label: "Chatbot PKn", icon: "💬" },
   { href: "/student/results", label: "Nilai Saya", icon: "📊" },
+  { href: "/student/profile", label: "Profil", icon: "👤" },
 ];
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {

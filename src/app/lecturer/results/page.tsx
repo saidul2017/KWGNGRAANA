@@ -60,7 +60,12 @@ export default async function LecturerResultsPage({
       <header className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">📈 Nilai Kelas</h1>
-          <p className="text-sm text-slate-600">Leaderboard &amp; rekap pengerjaan mahasiswa.</p>
+          <p className="text-sm text-slate-600">
+            Leaderboard &amp; rekap pengerjaan mahasiswa ·{" "}
+            <Link href="/lecturer/results/groups" className="text-brand-600 hover:underline">
+              👥 Lihat per kelompok →
+            </Link>
+          </p>
         </div>
         <div className="flex items-end gap-2">
           <form className="flex gap-2">

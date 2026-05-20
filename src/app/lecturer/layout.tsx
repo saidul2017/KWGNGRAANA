@@ -9,6 +9,7 @@ const NAV = [
   { href: "/lecturer/groups", label: "Kelompok", icon: "👥" },
   { href: "/lecturer/students", label: "Mahasiswa", icon: "🎓" },
   { href: "/lecturer/results", label: "Nilai Kelas", icon: "📈" },
+  { href: "/lecturer/profile", label: "Profil", icon: "👤" },
 ];
 
 export default async function LecturerLayout({ children }: { children: React.ReactNode }) {

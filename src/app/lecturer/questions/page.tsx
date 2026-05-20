@@ -27,7 +27,10 @@ export default async function QuestionsPage() {
             Total <strong>{questions.length}</strong> soal dalam <strong>{byTopic.size}</strong> topik.
           </p>
         </div>
-        <Link href="/lecturer/questions/new" className="btn-primary">+ Tambah Soal</Link>
+        <div className="flex gap-2">
+          <Link href="/lecturer/questions/import" className="btn-ghost">📥 Import Excel</Link>
+          <Link href="/lecturer/questions/new" className="btn-primary">+ Tambah Soal</Link>
+        </div>
       </header>
 
       {questions.length === 0 ? (
