@@ -5,6 +5,7 @@ import { requireUser, AuthError } from "@/lib/session";
 import { calculateScore } from "@/lib/scoring";
 import { gradeEssay } from "@/lib/essay-grading";
 import { rowToQuestion, type QuestionRow } from "@/lib/types";
+import { rateLimit } from "@/lib/rate-limit";
 
 const Body = z.object({
   questionId: z.number().int().positive(),
@@ -67,6 +68,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   // ===== ESSAY =====
   if (q.type === "essay") {
+    // Rate limit: max 10 esai per 5 menit per user (tiap esai = 1 panggilan Gemini berbayar).
+    const rl = rateLimit(`essay:user:${user.id}`, 10, 5 * 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        {
+          error: `Penilaian esai sementara dibatasi. Tunggu ${Math.ceil(
+            rl.retryAfterMs / 1000
+          )} detik.`,
+        },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
     const text = (essayText ?? "").trim();
     const grading = await gradeEssay({
       questionText: q.text,

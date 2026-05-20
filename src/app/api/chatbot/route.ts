@@ -4,6 +4,7 @@ import { all, run } from "@/lib/db";
 import { requireUser, AuthError } from "@/lib/session";
 import { searchKb } from "@/lib/chatbot-rules";
 import { isLlmEnabled, generateContent } from "@/lib/llm";
+import { rateLimit } from "@/lib/rate-limit";
 
 const Body = z.object({
   message: z.string().min(1).max(2000),
@@ -69,6 +70,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Pesan tidak valid" }, { status: 400 });
   }
   const { message } = parsed.data;
+
+  // Rate limit: maks 30 pesan per 60 detik per user (cukup untuk pemakaian wajar,
+  // mencegah abuse spam ke Gemini)
+  const rl = rateLimit(`chatbot:user:${user.id}`, 30, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      {
+        error: `Terlalu banyak pesan. Silakan tunggu ${Math.ceil(
+          rl.retryAfterMs / 1000
+        )} detik. (Batas: ${rl.limit} pesan/menit)`,
+      },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+    );
+  }
 
   // Simpan pesan user
   await run(

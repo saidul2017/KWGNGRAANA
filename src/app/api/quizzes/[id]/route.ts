@@ -45,6 +45,8 @@ const PatchBody = z.object({
   mode: z.enum(["individual", "group"]).optional(),
   status: z.enum(["draft", "open", "closed"]).optional(),
   shuffle: z.boolean().optional(),
+  startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
   questionIds: z.array(z.number().int().positive()).optional(),
 });
 
@@ -65,6 +67,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (data.mode !== undefined) { fields.push("mode = ?"); values.push(data.mode); }
   if (data.status !== undefined) { fields.push("status = ?"); values.push(data.status); }
   if (data.shuffle !== undefined) { fields.push("shuffle = ?"); values.push(data.shuffle ? 1 : 0); }
+  if (data.startsAt !== undefined) { fields.push("starts_at = ?"); values.push(data.startsAt); }
+  if (data.endsAt !== undefined) { fields.push("ends_at = ?"); values.push(data.endsAt); }
   if (fields.length) {
     values.push(id);
     await run(`UPDATE quizzes SET ${fields.join(", ")} WHERE id = ?`, values);

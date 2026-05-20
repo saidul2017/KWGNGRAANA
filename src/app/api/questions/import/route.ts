@@ -54,6 +54,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Format file tidak valid (bukan .xlsx?)" }, { status: 400 });
   }
 
+  // Cegah DoS via file dengan ribuan baris
+  const MAX_ROWS = 500;
+  if (rows.length > MAX_ROWS) {
+    return NextResponse.json(
+      { error: `Terlalu banyak baris (${rows.length}). Maksimum ${MAX_ROWS} per upload — pisahkan ke beberapa file.` },
+      { status: 400 }
+    );
+  }
+
   const results: RowResult[] = [];
   let created = 0;
   let skipped = 0;

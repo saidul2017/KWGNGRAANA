@@ -90,8 +90,9 @@ export async function GET(req: Request) {
             COALESCE(MIN(a.total_score), 0) AS min_score
      FROM quizzes q
      LEFT JOIN attempts a ON a.quiz_id = q.id AND a.status='completed'
-     ${quizId ? `WHERE q.id = ${Number(quizId)}` : ""}
-     GROUP BY q.id ORDER BY q.title ASC`
+     ${quizId ? `WHERE q.id = ?` : ""}
+     GROUP BY q.id ORDER BY q.title ASC`,
+    quizId ? [Number(quizId)] : []
   );
 
   // Bangun workbook

@@ -26,6 +26,31 @@ export default async function PlayPage({
     );
   }
 
+  // Enforcement jadwal: starts_at / ends_at (jika diset)
+  if (quiz.kind !== "practice") {
+    const now = Date.now();
+    if (quiz.startsAt) {
+      const startMs = new Date(quiz.startsAt).getTime();
+      if (Number.isFinite(startMs) && now < startMs) {
+        redirect(
+          `/student?error=${encodeURIComponent(
+            `Kuis "${quiz.title}" baru dibuka pada ${new Date(startMs).toLocaleString("id-ID")}.`
+          )}`
+        );
+      }
+    }
+    if (quiz.endsAt) {
+      const endMs = new Date(quiz.endsAt).getTime();
+      if (Number.isFinite(endMs) && now > endMs) {
+        redirect(
+          `/student?error=${encodeURIComponent(
+            `Kuis "${quiz.title}" sudah ditutup pada ${new Date(endMs).toLocaleString("id-ID")}.`
+          )}`
+        );
+      }
+    }
+  }
+
   if (quiz.kind !== "practice") {
     const done = await get<{ id: number }>(
       `SELECT id FROM attempts WHERE quiz_id = ? AND user_id = ? AND status='completed' LIMIT 1`,

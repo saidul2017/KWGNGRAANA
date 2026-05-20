@@ -34,6 +34,16 @@ type AiFeedback = {
   needsReview?: boolean;
 };
 
+function safeParseStringArray(s: string | null): string[] {
+  if (!s) return [];
+  try {
+    const parsed = JSON.parse(s);
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function parseAi(s: string | null): AiFeedback | null {
   if (!s) return null;
   try {
@@ -92,9 +102,7 @@ export default function EssayReviewer({ rows: initial }: { rows: Row[] }) {
     <div className="space-y-3">
       {rows.map((r) => {
         const ai = parseAi(r.ai_feedback);
-        const keyPoints = r.question_key_points
-          ? (JSON.parse(r.question_key_points) as string[])
-          : [];
+        const keyPoints = safeParseStringArray(r.question_key_points);
         const isReviewed = !!r.reviewed_at;
         const isOpen = openId === r.answer_id;
         const pct = Math.round((r.score_awarded / r.question_max) * 100);

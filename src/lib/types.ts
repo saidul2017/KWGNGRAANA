@@ -44,12 +44,19 @@ export function rowToQuestion(r: QuestionRow): Question {
       kp = null;
     }
   }
+  let options: string[] = [];
+  try {
+    const parsed = JSON.parse(r.options_json || "[]");
+    options = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    options = [];
+  }
   return {
     id: r.id,
     topic: r.topic,
     text: r.text,
     type: r.type,
-    options: JSON.parse(r.options_json) as string[],
+    options,
     correctIndex: r.correct_index,
     explanation: r.explanation,
     sourceRef: r.source_ref,

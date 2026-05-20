@@ -15,31 +15,47 @@ export type AppSession = {
   user?: SessionUser;
 };
 
-const password =
-  process.env.SESSION_PASSWORD ||
-  "ganti_dengan_minimal_32_karakter_random_yang_aman_xx";
+const DEV_FALLBACK = "ganti_dengan_minimal_32_karakter_random_yang_aman_xx";
 
-if (password.length < 32) {
-  // Aman: tetap berjalan dev, tapi log peringatan
-  // eslint-disable-next-line no-console
-  console.warn(
-    "[session] SESSION_PASSWORD terlalu pendek (<32 char). Set di .env.local sebelum produksi."
-  );
+/** Validasi runtime — dipanggil saat request menyentuh session. */
+function getSessionPassword(): string {
+  const password = process.env.SESSION_PASSWORD || DEV_FALLBACK;
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.SESSION_PASSWORD || password === DEV_FALLBACK) {
+      throw new Error(
+        "[session] FATAL: SESSION_PASSWORD wajib diisi di production (minimal 32 karakter random). " +
+          "Generate dengan: `openssl rand -base64 48` lalu set di environment server."
+      );
+    }
+    if (password.length < 32) {
+      throw new Error(
+        "[session] FATAL: SESSION_PASSWORD minimal 32 karakter. Saat ini: " + password.length
+      );
+    }
+  } else if (password.length < 32) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[session] SESSION_PASSWORD terlalu pendek (<32 char). Set di .env sebelum produksi."
+    );
+  }
+  return password;
 }
 
-export const sessionOptions: SessionOptions = {
-  password,
-  cookieName: "kwgn_session",
-  cookieOptions: {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 8, // 8 jam
-  },
-};
+function buildSessionOptions(): SessionOptions {
+  return {
+    password: getSessionPassword(),
+    cookieName: "kwgn_session",
+    cookieOptions: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 8, // 8 jam
+    },
+  };
+}
 
 export async function getSession() {
-  return getIronSession<AppSession>(cookies(), sessionOptions);
+  return getIronSession<AppSession>(cookies(), buildSessionOptions());
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {

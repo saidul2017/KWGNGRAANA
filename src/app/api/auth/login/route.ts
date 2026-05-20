@@ -50,16 +50,21 @@ export async function POST(req: Request) {
           [identifier.trim().toLowerCase()]
         );
 
-  if (!user) {
+  // Pesan generik untuk mencegah user enumeration. Selalu jalankan bcrypt.compare
+  // dengan dummy hash bila user tidak ada agar timing relatif konstan.
+  const DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuv0123456789ABCDEFGHIJKLMNOPQRSTUV";
+  const hashToCheck = user?.password_hash ?? DUMMY_HASH;
+  const ok = await bcrypt.compare(password, hashToCheck);
+  if (!user || !ok) {
     return NextResponse.json(
-      { error: role === "student" ? "NIM tidak terdaftar" : "Email tidak terdaftar" },
+      {
+        error:
+          role === "student"
+            ? "NIM atau password salah"
+            : "Email atau password salah",
+      },
       { status: 401 }
     );
-  }
-
-  const ok = await bcrypt.compare(password, user.password_hash);
-  if (!ok) {
-    return NextResponse.json({ error: "Password salah" }, { status: 401 });
   }
 
   const session = await getSession();

@@ -60,12 +60,27 @@ export async function generateContent(args: GenerateArgs): Promise<GenerateResul
   };
 
   const url = `${API_BASE}/models/${model}:generateContent?key=${key}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
+  // Timeout 30s untuk mencegah request hang. AbortController kompatibel dgn fetch.
+  const ac = new AbortController();
+  const timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS) || 30_000;
+  const timeoutId = setTimeout(() => ac.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: ac.signal,
+    });
+  } catch (err) {
+    if ((err as { name?: string })?.name === "AbortError") {
+      throw new Error(`Gemini API timeout (${timeoutMs}ms)`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => "");
