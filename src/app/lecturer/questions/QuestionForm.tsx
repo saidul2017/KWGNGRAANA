@@ -8,6 +8,7 @@ type Initial = {
   id?: number;
   topic: string;
   text: string;
+  type: "mcq" | "essay";
   options: string[];
   correctIndex: number;
   explanation: string;
@@ -15,11 +16,14 @@ type Initial = {
   difficulty: "easy" | "medium" | "hard";
   timeLimit: number;
   maxPoints: number;
+  essayKeyPoints: string[];
+  essayMinWords: number;
 };
 
 const EMPTY: Initial = {
   topic: "Pancasila",
   text: "",
+  type: "mcq",
   options: ["", "", "", ""],
   correctIndex: 0,
   explanation: "",
@@ -27,6 +31,8 @@ const EMPTY: Initial = {
   difficulty: "medium",
   timeLimit: 20,
   maxPoints: 1000,
+  essayKeyPoints: [""],
+  essayMinWords: 30,
 };
 
 export default function QuestionForm({ initial }: { initial?: Initial }) {
@@ -35,22 +41,15 @@ export default function QuestionForm({ initial }: { initial?: Initial }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function setOption(i: number, value: string) {
+  function setOpt(i: number, v: string) {
     const opts = [...data.options];
-    opts[i] = value;
+    opts[i] = v;
     setData({ ...data, options: opts });
   }
-  function addOption() {
-    if (data.options.length >= 6) return;
-    setData({ ...data, options: [...data.options, ""] });
-  }
-  function removeOption(i: number) {
-    if (data.options.length <= 2) return;
-    const opts = data.options.filter((_, idx) => idx !== i);
-    let correct = data.correctIndex;
-    if (correct === i) correct = 0;
-    else if (correct > i) correct--;
-    setData({ ...data, options: opts, correctIndex: correct });
+  function setKp(i: number, v: string) {
+    const kp = [...data.essayKeyPoints];
+    kp[i] = v;
+    setData({ ...data, essayKeyPoints: kp });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -60,10 +59,36 @@ export default function QuestionForm({ initial }: { initial?: Initial }) {
     try {
       const url = data.id ? `/api/questions/${data.id}` : `/api/questions`;
       const method = data.id ? "PUT" : "POST";
+      const payload =
+        data.type === "mcq"
+          ? {
+              topic: data.topic,
+              text: data.text,
+              type: "mcq",
+              options: data.options.filter((o) => o.trim()),
+              correctIndex: data.correctIndex,
+              explanation: data.explanation,
+              sourceRef: data.sourceRef,
+              difficulty: data.difficulty,
+              timeLimit: data.timeLimit,
+              maxPoints: data.maxPoints,
+            }
+          : {
+              topic: data.topic,
+              text: data.text,
+              type: "essay",
+              explanation: data.explanation,
+              sourceRef: data.sourceRef,
+              difficulty: data.difficulty,
+              timeLimit: data.timeLimit,
+              maxPoints: data.maxPoints,
+              essayKeyPoints: data.essayKeyPoints.filter((k) => k.trim()),
+              essayMinWords: data.essayMinWords,
+            };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       const j = await res.json();
       if (!res.ok) {
@@ -81,7 +106,25 @@ export default function QuestionForm({ initial }: { initial?: Initial }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 card">
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-3 gap-4">
+        <div>
+          <label className="label">Tipe Soal</label>
+          <select
+            className="input"
+            value={data.type}
+            onChange={(e) => {
+              const t = e.target.value as "mcq" | "essay";
+              setData({
+                ...data,
+                type: t,
+                timeLimit: t === "essay" && data.timeLimit < 60 ? 180 : data.timeLimit,
+              });
+            }}
+          >
+            <option value="mcq">📝 Pilihan Ganda</option>
+            <option value="essay">✍️ Esai (auto-grading AI)</option>
+          </select>
+        </div>
         <div>
           <label className="label">Topik</label>
           <select
@@ -89,9 +132,7 @@ export default function QuestionForm({ initial }: { initial?: Initial }) {
             value={data.topic}
             onChange={(e) => setData({ ...data, topic: e.target.value })}
           >
-            {TOPICS.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
+            {TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
         <div>
@@ -99,9 +140,7 @@ export default function QuestionForm({ initial }: { initial?: Initial }) {
           <select
             className="input"
             value={data.difficulty}
-            onChange={(e) =>
-              setData({ ...data, difficulty: e.target.value as Initial["difficulty"] })
-            }
+            onChange={(e) => setData({ ...data, difficulty: e.target.value as Initial["difficulty"] })}
           >
             <option value="easy">Mudah</option>
             <option value="medium">Sedang</option>
@@ -118,57 +157,129 @@ export default function QuestionForm({ initial }: { initial?: Initial }) {
           minLength={5}
           value={data.text}
           onChange={(e) => setData({ ...data, text: e.target.value })}
-          placeholder="Contoh: Pasal 27 ayat (1) UUD 1945 menegaskan bahwa..."
+          placeholder={
+            data.type === "essay"
+              ? "Contoh: Jelaskan makna Pasal 27 UUD 1945 ayat (1) bagi calon guru MI."
+              : "Contoh: Pasal 27 ayat (1) UUD 1945 menegaskan bahwa..."
+          }
         />
       </div>
 
-      <div>
-        <label className="label">Opsi Jawaban (klik radio untuk menandai jawaban benar)</label>
-        <div className="space-y-2">
-          {data.options.map((opt, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="correct"
-                checked={data.correctIndex === i}
-                onChange={() => setData({ ...data, correctIndex: i })}
-                className="h-4 w-4 text-brand-600"
-              />
-              <span className="text-sm font-medium w-6">{String.fromCharCode(65 + i)}.</span>
-              <input
-                type="text"
-                className="input flex-1"
-                required
-                value={opt}
-                onChange={(e) => setOption(i, e.target.value)}
-                placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
-              />
-              {data.options.length > 2 && (
+      {data.type === "mcq" ? (
+        <div>
+          <label className="label">
+            Opsi Jawaban (klik radio untuk menandai jawaban benar)
+          </label>
+          <div className="space-y-2">
+            {data.options.map((opt, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="correct"
+                  checked={data.correctIndex === i}
+                  onChange={() => setData({ ...data, correctIndex: i })}
+                  className="h-4 w-4 text-brand-600"
+                />
+                <span className="text-sm font-medium w-6">{String.fromCharCode(65 + i)}.</span>
+                <input
+                  type="text"
+                  className="input flex-1"
+                  required
+                  value={opt}
+                  onChange={(e) => setOpt(i, e.target.value)}
+                  placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
+                />
+                {data.options.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const opts = data.options.filter((_, idx) => idx !== i);
+                      let c = data.correctIndex;
+                      if (c === i) c = 0;
+                      else if (c > i) c--;
+                      setData({ ...data, options: opts, correctIndex: c });
+                    }}
+                    className="text-rose-600 text-sm hover:underline"
+                  >
+                    Hapus
+                  </button>
+                )}
+              </div>
+            ))}
+            {data.options.length < 6 && (
+              <button
+                type="button"
+                onClick={() => setData({ ...data, options: [...data.options, ""] })}
+                className="btn-ghost text-sm"
+              >
+                + Tambah Opsi
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="rounded-lg bg-violet-50 border border-violet-200 px-3 py-2 text-xs text-violet-800">
+            🤖 <strong>Auto-grading AI</strong> — saat mahasiswa menjawab, jawaban
+            akan dinilai otomatis oleh Gemini berdasarkan poin kunci di bawah.
+            Skor 0–100% dari max poin, plus feedback konstruktif.
+          </div>
+          <div>
+            <label className="label">Poin Kunci Rubrik (yang harus muncul dalam jawaban)</label>
+            <div className="space-y-2">
+              {data.essayKeyPoints.map((kp, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-sm font-medium w-6">{i + 1}.</span>
+                  <input
+                    type="text"
+                    className="input flex-1"
+                    value={kp}
+                    onChange={(e) => setKp(i, e.target.value)}
+                    placeholder={`Mis. "Mengaitkan Pasal 27 dengan praktik HAM dalam pembelajaran"`}
+                  />
+                  {data.essayKeyPoints.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setData({ ...data, essayKeyPoints: data.essayKeyPoints.filter((_, idx) => idx !== i) })}
+                      className="text-rose-600 text-sm hover:underline"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+              ))}
+              {data.essayKeyPoints.length < 8 && (
                 <button
                   type="button"
-                  onClick={() => removeOption(i)}
-                  className="text-rose-600 text-sm hover:underline"
+                  onClick={() => setData({ ...data, essayKeyPoints: [...data.essayKeyPoints, ""] })}
+                  className="btn-ghost text-sm"
                 >
-                  Hapus
+                  + Tambah Poin
                 </button>
               )}
             </div>
-          ))}
-          {data.options.length < 6 && (
-            <button type="button" onClick={addOption} className="btn-ghost text-sm">
-              + Tambah Opsi
-            </button>
-          )}
+          </div>
+          <div>
+            <label className="label">Minimal Kata Jawaban (0 = bebas)</label>
+            <input
+              type="number"
+              min={0}
+              max={2000}
+              className="input max-w-[160px]"
+              value={data.essayMinWords}
+              onChange={(e) => setData({ ...data, essayMinWords: Number(e.target.value) })}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
-        <label className="label">Penjelasan Jawaban</label>
+        <label className="label">Penjelasan / Kunci Jawaban Ringkas</label>
         <textarea
           className="input min-h-[60px]"
           value={data.explanation}
           onChange={(e) => setData({ ...data, explanation: e.target.value })}
-          placeholder="Penjelasan akan ditampilkan ke mahasiswa setelah menjawab."
+          placeholder="Akan ditampilkan ke mahasiswa setelah menjawab."
         />
       </div>
 
@@ -183,11 +294,13 @@ export default function QuestionForm({ initial }: { initial?: Initial }) {
           />
         </div>
         <div>
-          <label className="label">Batas Waktu (detik)</label>
+          <label className="label">
+            Batas Waktu (detik) {data.type === "essay" && "— direkomendasikan ≥120"}
+          </label>
           <input
             type="number"
             min={5}
-            max={180}
+            max={600}
             className="input"
             value={data.timeLimit}
             onChange={(e) => setData({ ...data, timeLimit: Number(e.target.value) })}

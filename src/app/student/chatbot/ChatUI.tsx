@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Msg = { id: number | string; role: "user" | "assistant"; content: string; created_at?: string };
+type Msg = {
+  id: number | string;
+  role: "user" | "assistant";
+  content: string;
+  topic?: string | null; // berisi 'kb' | 'ai' | 'fallback' utk pesan assistant
+  created_at?: string;
+};
 
 const SUGGESTIONS = [
   "Apa isi Pasal 27 UUD 1945?",
@@ -11,6 +17,21 @@ const SUGGESTIONS = [
   "Apa itu Wawasan Nusantara?",
   "Sebutkan 9 nilai antikorupsi KPK",
 ];
+
+function SourceBadge({ source }: { source?: string | null }) {
+  if (!source) return null;
+  const map: Record<string, { label: string; cls: string; emoji: string }> = {
+    kb: { label: "Basis Pengetahuan", cls: "bg-emerald-100 text-emerald-800", emoji: "📚" },
+    ai: { label: "AI Gemini", cls: "bg-violet-100 text-violet-800", emoji: "🤖" },
+    fallback: { label: "Tidak ditemukan", cls: "bg-slate-100 text-slate-600", emoji: "❓" },
+  };
+  const m = map[source] ?? map.fallback;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${m.cls}`}>
+      {m.emoji} {m.label}
+    </span>
+  );
+}
 
 export default function ChatUI({ initialMessages }: { initialMessages: Msg[] }) {
   const [messages, setMessages] = useState<Msg[]>(initialMessages);
@@ -36,12 +57,21 @@ export default function ChatUI({ initialMessages }: { initialMessages: Msg[] }) 
       });
       const data = await res.json();
       if (!res.ok) {
-        setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "assistant", content: data.error || "Gagal mendapatkan jawaban" }]);
+        setMessages((m) => [
+          ...m,
+          { id: `err-${Date.now()}`, role: "assistant", content: data.error || "Gagal mendapatkan jawaban", topic: "fallback" },
+        ]);
       } else {
-        setMessages((m) => [...m, { id: `a-${Date.now()}`, role: "assistant", content: data.reply }]);
+        setMessages((m) => [
+          ...m,
+          { id: `a-${Date.now()}`, role: "assistant", content: data.reply, topic: data.source },
+        ]);
       }
     } catch {
-      setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "assistant", content: "Kesalahan jaringan" }]);
+      setMessages((m) => [
+        ...m,
+        { id: `err-${Date.now()}`, role: "assistant", content: "Kesalahan jaringan", topic: "fallback" },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -68,18 +98,16 @@ export default function ChatUI({ initialMessages }: { initialMessages: Msg[] }) 
           </div>
         )}
         {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
-                m.role === "user"
-                  ? "bg-brand-600 text-white"
-                  : "bg-slate-100 text-slate-800"
-              }`}
-            >
-              {m.content}
+          <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className="max-w-[88%] flex flex-col gap-1">
+              <div
+                className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
+                  m.role === "user" ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800"
+                }`}
+              >
+                {m.content}
+              </div>
+              {m.role === "assistant" && <SourceBadge source={m.topic} />}
             </div>
           </div>
         ))}

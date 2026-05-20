@@ -3,19 +3,19 @@ import { z } from "zod";
 import { get, run } from "@/lib/db";
 import { requireUser, AuthError } from "@/lib/session";
 import { calculateScore } from "@/lib/scoring";
+import { gradeEssay } from "@/lib/essay-grading";
 import { rowToQuestion, type QuestionRow } from "@/lib/types";
 
 const Body = z.object({
   questionId: z.number().int().positive(),
-  selectedIndex: z.number().int().min(-1), // -1 = timeout / tidak menjawab
+  selectedIndex: z.number().int().min(-1).optional(),
+  essayText: z.string().max(5000).optional(),
   responseMs: z.number().int().min(0),
 });
 
 /**
- * Mahasiswa submit jawaban satu soal.
  * POST /api/attempts/[id]/answer
- *
- * Mengembalikan koreksi: { isCorrect, correctIndex, scoreAwarded, explanation }.
+ * Mendukung MCQ (selectedIndex) dan Essay (essayText, dinilai Gemini).
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   let user;
@@ -32,9 +32,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!parsed.success) {
     return NextResponse.json({ error: "Input tidak valid" }, { status: 400 });
   }
-  const { questionId, selectedIndex, responseMs } = parsed.data;
+  const { questionId, selectedIndex, essayText, responseMs } = parsed.data;
 
-  // Validasi attempt milik user dan masih in_progress.
   const attempt = await get<{
     id: number;
     user_id: number;
@@ -54,7 +53,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Attempt sudah selesai" }, { status: 409 });
   }
 
-  // Cegah jawaban duplikat untuk soal yang sama dalam 1 attempt.
   const existing = await get<{ id: number }>(
     `SELECT id FROM answers WHERE attempt_id = ? AND question_id = ? LIMIT 1`,
     [attemptId, questionId]
@@ -63,11 +61,65 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Soal ini sudah dijawab." }, { status: 409 });
   }
 
-  // Ambil soal dari DB (otoritatif)
   const qRow = await get<QuestionRow>(`SELECT * FROM questions WHERE id = ?`, [questionId]);
   if (!qRow) return NextResponse.json({ error: "Soal tidak ditemukan" }, { status: 404 });
   const q = rowToQuestion(qRow);
 
+  // ===== ESSAY =====
+  if (q.type === "essay") {
+    const text = (essayText ?? "").trim();
+    const grading = await gradeEssay({
+      questionText: q.text,
+      questionTopic: q.topic,
+      sourceRef: q.sourceRef,
+      keyPoints: q.essayKeyPoints ?? [],
+      studentAnswer: text,
+      maxPoints: q.maxPoints,
+    });
+
+    const isCorrect = grading.scorePct >= 70 ? 1 : 0;
+    await run(
+      `INSERT INTO answers
+        (attempt_id, question_id, selected_index, essay_text, ai_feedback, is_correct, response_ms, score_awarded)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+      [
+        attemptId,
+        questionId,
+        text,
+        JSON.stringify({
+          feedback: grading.feedback,
+          matchedPoints: grading.matchedPoints,
+          missingPoints: grading.missingPoints,
+          scorePct: grading.scorePct,
+          needsReview: grading.needsReview,
+        }),
+        isCorrect,
+        responseMs,
+        grading.scoreAwarded,
+      ]
+    );
+    await run(
+      `UPDATE attempts SET total_score = total_score + ?, total_correct = total_correct + ?
+       WHERE id = ?`,
+      [grading.scoreAwarded, isCorrect, attemptId]
+    );
+    return NextResponse.json({
+      isCorrect: !!isCorrect,
+      scoreAwarded: grading.scoreAwarded,
+      scorePct: grading.scorePct,
+      feedback: grading.feedback,
+      matchedPoints: grading.matchedPoints,
+      missingPoints: grading.missingPoints,
+      explanation: q.explanation,
+      sourceRef: q.sourceRef,
+      runningTotal: attempt.total_score + grading.scoreAwarded,
+    });
+  }
+
+  // ===== MCQ =====
+  if (selectedIndex === undefined) {
+    return NextResponse.json({ error: "selectedIndex wajib untuk MCQ" }, { status: 400 });
+  }
   const isCorrect = selectedIndex === q.correctIndex;
   const score = calculateScore({
     isCorrect,

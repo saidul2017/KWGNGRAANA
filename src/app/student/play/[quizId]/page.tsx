@@ -7,10 +7,6 @@ import { shuffle } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Halaman ini langsung memulai (atau melanjutkan) attempt mahasiswa.
- * Server-side: validasi & buat attempt, lalu render player.
- */
 export default async function PlayPage({
   params,
 }: {
@@ -79,10 +75,12 @@ export default async function PlayPage({
     id: q.id,
     topic: q.topic,
     text: q.text,
+    type: (q.type === "essay" ? "essay" : "mcq") as "mcq" | "essay",
     options: q.options,
     timeLimit: q.timeLimit,
     maxPoints: q.maxPoints,
     sourceRef: q.sourceRef,
+    essayMinWords: q.essayMinWords,
   }));
 
   return (

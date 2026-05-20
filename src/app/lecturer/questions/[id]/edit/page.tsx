@@ -21,13 +21,17 @@ export default async function EditQuestionPage({
           id: q.id,
           topic: q.topic,
           text: q.text,
-          options: q.options,
+          type: q.type === "essay" ? "essay" : "mcq",
+          options: q.options.length > 0 ? q.options : ["", "", "", ""],
           correctIndex: q.correctIndex,
           explanation: q.explanation ?? "",
           sourceRef: q.sourceRef ?? "",
           difficulty: q.difficulty,
           timeLimit: q.timeLimit,
           maxPoints: q.maxPoints,
+          essayKeyPoints:
+            q.essayKeyPoints && q.essayKeyPoints.length > 0 ? q.essayKeyPoints : [""],
+          essayMinWords: q.essayMinWords ?? 30,
         }}
       />
     </div>

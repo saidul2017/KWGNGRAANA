@@ -154,16 +154,29 @@ export const KB: KbEntry[] = [
 
 /**
  * Cari jawaban di KB berdasarkan kata kunci. Mengembalikan jawaban dengan
- * skor pencocokan tertinggi, atau null jika tidak ada yang cocok.
+ * skor pencocokan tertinggi, atau null jika tidak ada yang cocok dengan
+ * threshold yang cukup.
+ *
+ * Aturan match (lebih ketat):
+ *   - Single keyword → minimal 6 char (mis. "pasal 27", "ius soli")
+ *   - Atau ≥2 keyword cocok
+ *   - Skor minimum 12
  */
 export function searchKb(query: string): KbEntry | null {
   const q = query.toLowerCase();
-  let best: { entry: KbEntry; score: number } | null = null;
+  let best: { entry: KbEntry; score: number; matchCount: number; minLen: number } | null = null;
   for (const entry of KB) {
     const matched = entry.keywords.filter((k) => q.includes(k.toLowerCase()));
     if (matched.length === 0) continue;
+    const minKwLen = Math.min(...matched.map((k) => k.length));
     const score = matched.length * 10 + matched.reduce((s, k) => s + k.length, 0);
-    if (!best || score > best.score) best = { entry, score };
+    if (!best || score > best.score) {
+      best = { entry, score, matchCount: matched.length, minLen: minKwLen };
+    }
   }
-  return best?.entry ?? null;
+  if (!best) return null;
+  // Threshold: minimal 2 keyword cocok, atau 1 keyword dengan panjang ≥6 char
+  if (best.matchCount === 1 && best.minLen < 6) return null;
+  if (best.score < 12) return null;
+  return best.entry;
 }

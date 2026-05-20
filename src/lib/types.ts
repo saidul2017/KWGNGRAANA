@@ -2,7 +2,7 @@ export type Question = {
   id: number;
   topic: string;
   text: string;
-  type: "mcq" | "tf";
+  type: "mcq" | "tf" | "essay";
   options: string[];
   correctIndex: number;
   explanation: string | null;
@@ -10,6 +10,8 @@ export type Question = {
   difficulty: "easy" | "medium" | "hard";
   timeLimit: number;
   maxPoints: number;
+  essayKeyPoints: string[] | null;
+  essayMinWords: number | null;
   createdBy: number | null;
   createdAt: string;
 };
@@ -18,7 +20,7 @@ export type QuestionRow = {
   id: number;
   topic: string;
   text: string;
-  type: "mcq" | "tf";
+  type: "mcq" | "tf" | "essay";
   options_json: string;
   correct_index: number;
   explanation: string | null;
@@ -26,11 +28,22 @@ export type QuestionRow = {
   difficulty: "easy" | "medium" | "hard";
   time_limit: number;
   max_points: number;
+  essay_key_points: string | null;
+  essay_min_words: number | null;
   created_by: number | null;
   created_at: string;
 };
 
 export function rowToQuestion(r: QuestionRow): Question {
+  let kp: string[] | null = null;
+  if (r.essay_key_points) {
+    try {
+      const parsed = JSON.parse(r.essay_key_points);
+      kp = Array.isArray(parsed) ? parsed : null;
+    } catch {
+      kp = null;
+    }
+  }
   return {
     id: r.id,
     topic: r.topic,
@@ -43,6 +56,8 @@ export function rowToQuestion(r: QuestionRow): Question {
     difficulty: r.difficulty,
     timeLimit: r.time_limit,
     maxPoints: r.max_points,
+    essayKeyPoints: kp,
+    essayMinWords: r.essay_min_words,
     createdBy: r.created_by,
     createdAt: r.created_at,
   };

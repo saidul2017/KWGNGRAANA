@@ -26,14 +26,16 @@ CREATE TABLE IF NOT EXISTS questions (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   topic         TEXT    NOT NULL,
   text          TEXT    NOT NULL,
-  type          TEXT    NOT NULL DEFAULT 'mcq' CHECK (type IN ('mcq','tf')),
-  options_json  TEXT    NOT NULL,           -- JSON array of strings
-  correct_index INTEGER NOT NULL,           -- index dari options yang benar
+  type          TEXT    NOT NULL DEFAULT 'mcq' CHECK (type IN ('mcq','tf','essay')),
+  options_json  TEXT    NOT NULL,           -- JSON array of strings (kosong utk essay)
+  correct_index INTEGER NOT NULL,           -- index opsi benar (0 utk essay)
   explanation   TEXT,
   source_ref    TEXT,                        -- mis. "UUD 1945 Pasal 27"
   difficulty    TEXT    NOT NULL DEFAULT 'medium' CHECK (difficulty IN ('easy','medium','hard')),
   time_limit    INTEGER NOT NULL DEFAULT 20, -- detik
   max_points    INTEGER NOT NULL DEFAULT 1000,
+  essay_key_points TEXT,                     -- JSON array: poin kunci yg harus muncul (utk essay)
+  essay_min_words  INTEGER,                  -- minimal kata jawaban (utk essay)
   created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
@@ -80,6 +82,8 @@ CREATE TABLE IF NOT EXISTS answers (
   attempt_id      INTEGER NOT NULL REFERENCES attempts(id) ON DELETE CASCADE,
   question_id     INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
   selected_index  INTEGER,
+  essay_text      TEXT,                        -- jawaban esai
+  ai_feedback     TEXT,                        -- feedback dari Gemini (utk esai)
   is_correct      INTEGER NOT NULL DEFAULT 0,  -- 1/0
   response_ms     INTEGER NOT NULL DEFAULT 0,
   score_awarded   INTEGER NOT NULL DEFAULT 0,

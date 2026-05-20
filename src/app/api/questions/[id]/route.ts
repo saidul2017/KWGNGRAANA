@@ -4,17 +4,35 @@ import { get, run } from "@/lib/db";
 import { requireUser, AuthError } from "@/lib/session";
 import { rowToQuestion, type QuestionRow } from "@/lib/types";
 
-const Body = z.object({
-  topic: z.string().min(1),
-  text: z.string().min(5),
-  options: z.array(z.string().min(1)).min(2).max(6),
-  correctIndex: z.number().int().min(0),
-  explanation: z.string().optional().default(""),
-  sourceRef: z.string().optional().default(""),
-  difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
-  timeLimit: z.number().int().min(5).max(180).default(20),
-  maxPoints: z.number().int().min(100).max(2000).default(1000),
-});
+const Body = z
+  .object({
+    topic: z.string().min(1),
+    text: z.string().min(5),
+    type: z.enum(["mcq", "essay"]).default("mcq"),
+    options: z.array(z.string()).default([]),
+    correctIndex: z.number().int().min(0).default(0),
+    explanation: z.string().optional().default(""),
+    sourceRef: z.string().optional().default(""),
+    difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
+    timeLimit: z.number().int().min(5).max(600).default(20),
+    maxPoints: z.number().int().min(100).max(2000).default(1000),
+    essayKeyPoints: z.array(z.string().min(1)).optional().default([]),
+    essayMinWords: z.number().int().min(0).max(2000).optional().default(0),
+  })
+  .superRefine((v, ctx) => {
+    if (v.type === "mcq") {
+      if (v.options.length < 2 || v.options.length > 6) {
+        ctx.addIssue({ code: "custom", path: ["options"], message: "MCQ butuh 2–6 opsi" });
+      }
+      if (v.correctIndex >= v.options.length) {
+        ctx.addIssue({ code: "custom", path: ["correctIndex"], message: "correctIndex di luar jangkauan" });
+      }
+    } else {
+      if (v.essayKeyPoints.length < 1) {
+        ctx.addIssue({ code: "custom", path: ["essayKeyPoints"], message: "Esai butuh minimal 1 poin kunci rubrik" });
+      }
+    }
+  });
 
 async function guard() {
   try {
@@ -47,22 +65,31 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     );
   }
   const q = parsed.data;
-  if (q.correctIndex >= q.options.length) {
-    return NextResponse.json({ error: "Indeks jawaban benar di luar jangkauan" }, { status: 400 });
-  }
+  const isEssay = q.type === "essay";
+  const optionsJson = isEssay ? "[]" : JSON.stringify(q.options);
+  const correctIndex = isEssay ? 0 : q.correctIndex;
+  const essayKp = isEssay ? JSON.stringify(q.essayKeyPoints) : null;
+  const essayMin = isEssay ? q.essayMinWords : null;
+  const timeLimit = isEssay && q.timeLimit < 60 ? 180 : q.timeLimit;
+
   await run(
-    `UPDATE questions SET topic=?, text=?, options_json=?, correct_index=?, explanation=?, source_ref=?, difficulty=?, time_limit=?, max_points=?
+    `UPDATE questions SET topic=?, text=?, type=?, options_json=?, correct_index=?,
+       explanation=?, source_ref=?, difficulty=?, time_limit=?, max_points=?,
+       essay_key_points=?, essay_min_words=?
      WHERE id=?`,
     [
       q.topic,
       q.text,
-      JSON.stringify(q.options),
-      q.correctIndex,
+      q.type,
+      optionsJson,
+      correctIndex,
       q.explanation,
       q.sourceRef,
       q.difficulty,
-      q.timeLimit,
+      timeLimit,
       q.maxPoints,
+      essayKp,
+      essayMin,
       id,
     ]
   );
