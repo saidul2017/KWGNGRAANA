@@ -10,8 +10,12 @@ type RowResult =
 /**
  * POST /api/questions/import (multipart/form-data, field "file")
  *
- * Membaca .xlsx, sheet pertama, kolom: topic, text, optionA..F, correct (A..F),
- * explanation, sourceRef, difficulty (easy/medium/hard), timeLimit, maxPoints.
+ * Membaca .xlsx, sheet pertama. Kolom:
+ *   type, topic, text, optionA..F, correct, keyPoints, minWords,
+ *   explanation, sourceRef, difficulty, timeLimit, maxPoints.
+ *
+ * type='mcq' (default) butuh optionA..correct.
+ * type='essay' butuh keyPoints (poin dipisah '|') dan minWords.
  *
  * Idempoten: kombinasi (topic, text) yang sama tidak akan diduplikasi.
  */
@@ -56,27 +60,17 @@ export async function POST(req: Request) {
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const rowNum = i + 2; // +1 header, +1 1-indexed
+    const rowNum = i + 2;
     try {
+      const type = String(r.type ?? "mcq").trim().toLowerCase();
+      if (type !== "mcq" && type !== "essay") {
+        results.push({ ok: false, row: rowNum, error: `type tidak valid: '${type}' (gunakan 'mcq' atau 'essay')` });
+        continue;
+      }
       const topic = String(r.topic ?? "").trim();
       const text = String(r.text ?? "").trim();
       if (!topic || !text) {
         results.push({ ok: false, row: rowNum, error: "topic atau text kosong" });
-        continue;
-      }
-      const opts: string[] = [];
-      for (const k of ["optionA", "optionB", "optionC", "optionD", "optionE", "optionF"]) {
-        const v = String(r[k] ?? "").trim();
-        if (v) opts.push(v);
-      }
-      if (opts.length < 2) {
-        results.push({ ok: false, row: rowNum, error: "minimal 2 opsi (optionA, optionB)" });
-        continue;
-      }
-      const correctLetter = String(r.correct ?? "").trim().toUpperCase();
-      const correctIndex = "ABCDEF".indexOf(correctLetter);
-      if (correctIndex < 0 || correctIndex >= opts.length) {
-        results.push({ ok: false, row: rowNum, error: `correct ('${correctLetter}') di luar jangkauan opsi` });
         continue;
       }
       const explanation = String(r.explanation ?? "").trim();
@@ -85,10 +79,48 @@ export async function POST(req: Request) {
         const d = String(r.difficulty ?? "medium").trim().toLowerCase();
         return ["easy", "medium", "hard"].includes(d) ? d : "medium";
       })() as "easy" | "medium" | "hard";
-      const timeLimit = Math.max(5, Math.min(180, Number(r.timeLimit) || 20));
       const maxPoints = Math.max(100, Math.min(2000, Number(r.maxPoints) || 1000));
 
-      // Idempoten cek
+      let optionsJson = "[]";
+      let correctIndex = 0;
+      let essayKp: string | null = null;
+      let essayMin: number | null = null;
+      let timeLimit = Math.max(5, Math.min(600, Number(r.timeLimit) || (type === "essay" ? 180 : 20)));
+
+      if (type === "mcq") {
+        const opts: string[] = [];
+        for (const k of ["optionA", "optionB", "optionC", "optionD", "optionE", "optionF"]) {
+          const v = String(r[k] ?? "").trim();
+          if (v) opts.push(v);
+        }
+        if (opts.length < 2) {
+          results.push({ ok: false, row: rowNum, error: "MCQ butuh minimal 2 opsi" });
+          continue;
+        }
+        const letter = String(r.correct ?? "").trim().toUpperCase();
+        const idx = "ABCDEF".indexOf(letter);
+        if (idx < 0 || idx >= opts.length) {
+          results.push({ ok: false, row: rowNum, error: `correct ('${letter}') di luar opsi` });
+          continue;
+        }
+        optionsJson = JSON.stringify(opts);
+        correctIndex = idx;
+      } else {
+        // essay
+        const kpRaw = String(r.keyPoints ?? "").trim();
+        if (!kpRaw) {
+          results.push({ ok: false, row: rowNum, error: "Esai butuh keyPoints (dipisah '|')" });
+          continue;
+        }
+        const kp = kpRaw.split("|").map((s) => s.trim()).filter(Boolean);
+        if (kp.length < 1) {
+          results.push({ ok: false, row: rowNum, error: "keyPoints tidak valid" });
+          continue;
+        }
+        essayKp = JSON.stringify(kp);
+        essayMin = Math.max(0, Math.min(2000, Number(r.minWords) || 0));
+      }
+
       const existing = await get<{ id: number }>(
         `SELECT id FROM questions WHERE topic = ? AND text = ? LIMIT 1`,
         [topic, text]
@@ -100,19 +132,12 @@ export async function POST(req: Request) {
       }
       await run(
         `INSERT INTO questions
-          (topic, text, type, options_json, correct_index, explanation, source_ref, difficulty, time_limit, max_points, created_by)
-         VALUES (?, ?, 'mcq', ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (topic, text, type, options_json, correct_index, explanation, source_ref, difficulty, time_limit, max_points, essay_key_points, essay_min_words, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          topic,
-          text,
-          JSON.stringify(opts),
-          correctIndex,
-          explanation,
-          sourceRef,
-          difficulty,
-          timeLimit,
-          maxPoints,
-          user.id,
+          topic, text, type, optionsJson, correctIndex,
+          explanation, sourceRef, difficulty, timeLimit, maxPoints,
+          essayKp, essayMin, user.id,
         ]
       );
       created++;

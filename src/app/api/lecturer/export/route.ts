@@ -172,6 +172,66 @@ export async function GET(req: Request) {
   );
   XLSX.utils.book_append_sheet(wb, sheet4, "Per Kelompok");
 
+  // Sheet 5: Jawaban Esai (jika ada)
+  const essays = await all<{
+    nim: string;
+    name: string;
+    quiz_title: string;
+    question_topic: string;
+    question_text: string;
+    essay_text: string | null;
+    score_awarded: number;
+    max_points: number;
+    original_score: number | null;
+    lecturer_note: string | null;
+    reviewed_at: string | null;
+    ai_feedback: string | null;
+  }>(
+    `SELECT u.nim, u.name, qz.title AS quiz_title,
+            qn.topic AS question_topic, qn.text AS question_text,
+            qn.max_points,
+            ans.essay_text, ans.score_awarded, ans.original_score,
+            ans.lecturer_note, ans.reviewed_at, ans.ai_feedback
+     FROM answers ans
+     JOIN attempts a ON a.id = ans.attempt_id
+     JOIN questions qn ON qn.id = ans.question_id AND qn.type='essay'
+     JOIN users u ON u.id = a.user_id
+     JOIN quizzes qz ON qz.id = a.quiz_id
+     WHERE a.status='completed' ${filterSql}
+     ORDER BY qz.title, u.nim`,
+    params
+  );
+  if (essays.length > 0) {
+    const sheet5 = XLSX.utils.json_to_sheet(
+      essays.map((r, i) => {
+        let aiFeedback = "";
+        try {
+          const parsed = JSON.parse(r.ai_feedback ?? "");
+          aiFeedback = parsed.feedback || "";
+        } catch { /* ignore */ }
+        return {
+          "No.": i + 1,
+          NIM: r.nim,
+          Nama: r.name,
+          Kuis: r.quiz_title,
+          Topik: r.question_topic,
+          Pertanyaan: r.question_text,
+          "Jawaban Mahasiswa": r.essay_text ?? "",
+          "Skor Final": r.score_awarded,
+          "Skor Maks": r.max_points,
+          "Persen": Math.round((r.score_awarded / r.max_points) * 100),
+          "Skor AI Awal":
+            r.original_score !== null ? r.original_score : r.score_awarded,
+          "Status": r.reviewed_at ? "Ditinjau dosen" : "Otomatis AI",
+          "Feedback AI": aiFeedback,
+          "Catatan Dosen": r.lecturer_note ?? "",
+          "Tanggal Tinjau": r.reviewed_at ?? "",
+        };
+      })
+    );
+    XLSX.utils.book_append_sheet(wb, sheet5, "Jawaban Esai");
+  }
+
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   const ts = new Date().toISOString().slice(0, 10);
   const filename = quizId

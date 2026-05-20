@@ -16,11 +16,18 @@ export default async function ImportQuestionsPage() {
       <div className="card">
         <h2 className="font-semibold mb-2">1. Unduh template terlebih dahulu</h2>
         <p className="text-sm text-slate-600 mb-3">
-          Kolom: <code className="text-xs bg-slate-100 px-1">topic</code>,{" "}
-          <code className="text-xs bg-slate-100 px-1">text</code>,{" "}
-          <code className="text-xs bg-slate-100 px-1">optionA..F</code>,{" "}
-          <code className="text-xs bg-slate-100 px-1">correct</code> (A..F),{" "}
-          <code className="text-xs bg-slate-100 px-1">explanation</code>,{" "}
+          Kolom wajib: <code className="text-xs bg-slate-100 px-1">type</code>{" "}
+          (mcq/essay), <code className="text-xs bg-slate-100 px-1">topic</code>,{" "}
+          <code className="text-xs bg-slate-100 px-1">text</code>.
+          <br />
+          MCQ: <code className="text-xs bg-slate-100 px-1">optionA..F</code> +{" "}
+          <code className="text-xs bg-slate-100 px-1">correct</code> (A..F).
+          <br />
+          Essay: <code className="text-xs bg-slate-100 px-1">keyPoints</code>{" "}
+          (poin dipisah <code className="bg-slate-100 px-1">|</code>) +{" "}
+          <code className="text-xs bg-slate-100 px-1">minWords</code>.
+          <br />
+          Opsional: <code className="text-xs bg-slate-100 px-1">explanation</code>,{" "}
           <code className="text-xs bg-slate-100 px-1">sourceRef</code>,{" "}
           <code className="text-xs bg-slate-100 px-1">difficulty</code>,{" "}
           <code className="text-xs bg-slate-100 px-1">timeLimit</code>,{" "}

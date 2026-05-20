@@ -83,10 +83,14 @@ CREATE TABLE IF NOT EXISTS answers (
   question_id     INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
   selected_index  INTEGER,
   essay_text      TEXT,                        -- jawaban esai
-  ai_feedback     TEXT,                        -- feedback dari Gemini (utk esai)
+  ai_feedback     TEXT,                        -- feedback AI (JSON utk esai)
   is_correct      INTEGER NOT NULL DEFAULT 0,  -- 1/0
   response_ms     INTEGER NOT NULL DEFAULT 0,
   score_awarded   INTEGER NOT NULL DEFAULT 0,
+  -- Override manual dosen (hanya untuk esai biasanya)
+  original_score  INTEGER,                     -- skor AI sebelum dosen override
+  lecturer_note   TEXT,                        -- catatan dosen saat override
+  reviewed_at     TEXT,                        -- waktu dosen meninjau
   answered_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_answers_attempt ON answers(attempt_id);

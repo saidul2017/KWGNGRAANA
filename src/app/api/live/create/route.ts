@@ -38,15 +38,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Kuis ini belum berisi soal." }, { status: 400 });
   }
 
+  // Live Kahoot tidak cocok untuk soal esai (AI grading butuh waktu, blok flow).
+  // Filter keluar agar live session berjalan lancar.
+  const mcqRows = qRows.filter((q) => q.type !== "essay");
+  if (mcqRows.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Kuis ini hanya berisi soal esai. Mode Live Kahoot tidak mendukung soal esai (gunakan mode self-paced agar AI grading bisa berjalan).",
+      },
+      { status: 400 }
+    );
+  }
+  const skipped = qRows.length - mcqRows.length;
+
   const session = createSession({
     quizId: quiz.id,
     quizTitle: quiz.title,
     quizMode: quiz.mode,
     hostId: user.id,
     hostName: user.name,
-    questions: qRows.map(rowToQuestion),
+    questions: mcqRows.map(rowToQuestion),
     shuffleQuestions: quiz.shuffle,
   });
 
-  return NextResponse.json({ ok: true, pin: session.pin });
+  return NextResponse.json({
+    ok: true,
+    pin: session.pin,
+    skippedEssayCount: skipped,
+  });
 }

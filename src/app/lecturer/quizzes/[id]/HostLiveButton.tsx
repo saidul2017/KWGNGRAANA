@@ -47,6 +47,9 @@ export default function HostLiveButton({
       >
         🎮 {busy ? "Memulai..." : "Mulai Live Kahoot"}
       </button>
+      <p className="text-xs text-slate-500 max-w-[260px] text-right">
+        Soal esai (jika ada) akan otomatis dilewati di mode Live.
+      </p>
       {error && <span className="text-xs text-rose-600">{error}</span>}
     </div>
   );

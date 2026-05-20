@@ -21,6 +21,10 @@ async function main() {
   await ensureColumn("questions", "essay_min_words", "INTEGER");
   await ensureColumn("answers", "essay_text", "TEXT");
   await ensureColumn("answers", "ai_feedback", "TEXT");
+  // Override manual oleh dosen
+  await ensureColumn("answers", "original_score", "INTEGER");
+  await ensureColumn("answers", "lecturer_note", "TEXT");
+  await ensureColumn("answers", "reviewed_at", "TEXT");
 
   // ===== Migrasi: jika CHECK lama (tanpa 'essay') masih ada, recreate questions =====
   await migrateQuestionsTypeCheck();
