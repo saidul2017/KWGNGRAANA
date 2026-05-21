@@ -1,26 +1,56 @@
 """Autentikasi sederhana untuk Streamlit.
-- Password di-hash bcrypt
+- Password di-hash dengan PBKDF2-SHA256 (pure-Python, tidak perlu compile C)
 - User session disimpan di st.session_state['user']
 - Helper require_login() & require_role() dipanggil di awal setiap halaman
 """
 from __future__ import annotations
 
-import bcrypt
+import hashlib
+import os
+import secrets
+
 import streamlit as st
 
 from . import db
 
+# Format hash: pbkdf2$iterations$salt_hex$hash_hex
+_ITERATIONS = 260_000  # OWASP recommendation for PBKDF2-SHA256
+
 
 def hash_password(plain: str) -> str:
-    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=10)).decode("utf-8")
+    """Hash password dengan PBKDF2-SHA256. Return string format internal."""
+    salt = os.urandom(16)
+    h = hashlib.pbkdf2_hmac("sha256", plain.encode("utf-8"), salt, _ITERATIONS)
+    return f"pbkdf2${_ITERATIONS}${salt.hex()}${h.hex()}"
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    """Verifikasi password terhadap hash. Mendukung format pbkdf2 dan bcrypt legacy."""
     if not hashed:
         return False
     try:
-        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
+        # Format baru: pbkdf2$iterations$salt_hex$hash_hex
+        if hashed.startswith("pbkdf2$"):
+            parts = hashed.split("$")
+            if len(parts) != 4:
+                return False
+            _, iters_str, salt_hex, hash_hex = parts
+            iters = int(iters_str)
+            salt = bytes.fromhex(salt_hex)
+            expected = bytes.fromhex(hash_hex)
+            actual = hashlib.pbkdf2_hmac("sha256", plain.encode("utf-8"), salt, iters)
+            return secrets.compare_digest(actual, expected)
+        # Legacy bcrypt format ($2b$... atau $2a$...) — fallback import
+        elif hashed.startswith("$2"):
+            try:
+                import bcrypt as _bcrypt
+                return _bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+            except ImportError:
+                # bcrypt tidak tersedia — tidak bisa verifikasi legacy hash
+                return False
+        else:
+            return False
+    except (ValueError, UnicodeDecodeError, Exception):
         return False
 
 
@@ -40,8 +70,8 @@ def login(role: str, identifier: str, password: str) -> tuple[bool, str]:
             (identifier.lower(),),
         )
 
-    # Selalu jalankan bcrypt agar timing relatif konstan
-    DUMMY = "$2b$10$abcdefghijklmnopqrstuv0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    # Selalu jalankan verify agar timing relatif konstan
+    DUMMY = hash_password("dummy_constant_time_padding")
     target_hash = row["password_hash"] if row else DUMMY
     ok = verify_password(password, target_hash)
 
@@ -60,7 +90,10 @@ def login(role: str, identifier: str, password: str) -> tuple[bool, str]:
 
 
 def logout() -> None:
-    for k in ("user", "current_attempt_id", "answer_state", "chat_history"):
+    for k in ("user", "current_attempt_id", "answer_state", "chat_history",
+              "play_quiz_id", "play_state", "play_questions", "play_index",
+              "play_attempt_id", "play_started_at", "play_total_score",
+              "play_total_correct", "play_last_result"):
         st.session_state.pop(k, None)
 
 
