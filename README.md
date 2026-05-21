@@ -1,246 +1,174 @@
-# KWGN Learning Hub
+# KWGN Learning Hub — Streamlit Edition
 
-**Sistem Pembelajaran Mata Kuliah Kewarganegaraan – S1 PGMI**
+**Sistem Pembelajaran Mata Kuliah Kewarganegaraan — S1 PGMI**
 
-Aplikasi web pendukung mata kuliah Kewarganegaraan PGMI: chatbot pembelajaran,
-latihan mandiri & kuis Kahoot-style (self-paced + Live), UAS dengan soal
-pilihan ganda dan **esai dengan auto-grading AI Gemini**, serta dashboard
-mahasiswa & dosen.
+Aplikasi web pendukung mata kuliah Kewarganegaraan PGMI dengan Streamlit:
+- Chatbot 2-layer (KB lokal + Gemini AI)
+- Latihan mandiri & kuis Kahoot-style (self-paced, timer per soal)
+- Soal pilihan ganda + **esai dengan auto-grading AI Gemini**
+- Dashboard mahasiswa & dosen
+- Tinjauan esai dengan override skor
+- Excel export 5 sheet & import bank soal
 
-## ✨ Fitur
+## ⚠️ Keterbatasan Streamlit (vs versi Next.js sebelumnya)
 
-| Modul | Untuk | Keterangan |
-| --- | --- | --- |
-| 🤖 **Chatbot 2-Layer** | Mahasiswa | KB lokal otoritatif → fallback Gemini dengan rambu akademis |
-| 🎯 **Latihan Mandiri** | Mahasiswa | Soal Kahoot-style, timer, feedback langsung, boleh diulang |
-| 🏆 **Kuis & UAS** | Mahasiswa & Dosen | Mode individu/kelompok, anti-curang (acak soal) |
-| 🎮 **Live Kahoot** | Real-time | PIN 6 digit, lobby, auto-reveal, leaderboard live |
-| ✍️ **Soal Esai + AI Grading** | Mahasiswa & Dosen | Rubrik berbasis poin kunci, skor 0–100% + feedback |
-| 👨‍🏫 **Tinjau Esai** | Dosen | Override skor AI dengan audit trail |
-| 📝 **Bank Soal** | Dosen | CRUD MCQ + Esai, import dari Excel |
-| 👥 **Manajemen Kelompok** | Dosen | Bagi mahasiswa, leaderboard antar-kelompok |
-| 📊 **Dashboard** | Mahasiswa & Dosen | Statistik, riwayat, progress |
-| 📥 **Excel Export** | Dosen | 5 sheet termasuk audit jawaban esai |
+| Fitur | Status |
+|---|---|
+| 🎮 Live Kahoot real-time multi-user | ❌ **DROPPED** — Streamlit tidak cocok |
+| 👥 43 mahasiswa concurrent | ⚠️ ~5–10 OK, di atas itu lambat |
+| 🎯 Timer Kuis | ✅ Otomatis refresh tiap 1s (tidak flicker) |
+| 🤖 Chatbot Gemini | ✅ Bekerja |
+| ✍️ Esai + AI Grading | ✅ Bekerja |
+| 📊 Excel Export 5 sheet | ✅ Bekerja |
+| 👨‍🏫 Tinjau Esai + override | ✅ Bekerja |
 
-## 🛠️ Stack Teknologi
+> Versi **Next.js full-feature** ada di branch `feat/initial-mvp` bila Anda
+> butuh kembali ke Live Kahoot real-time multi-user.
 
-- **Next.js 14** (App Router) + **TypeScript**
-- **SQLite** via `@libsql/client` (lokal, tanpa setup server)
-- **Tailwind CSS** dengan palet warna gaya Kahoot
-- **iron-session** untuk autentikasi cookie HTTP-only
-- **bcryptjs** untuk hashing password
-- **Zod** untuk validasi input
-- **Gemini API** (Google AI) untuk chatbot LLM & auto-grading esai
-
-## 🚀 Persiapan & Menjalankan Lokal
+## 🚀 Cara Menjalankan Lokal
 
 ```bash
-# 1. Salin & isi file env
-cp .env.example .env
+# 1. Clone & install dependencies
+git clone -b feat/streamlit https://github.com/saidul2017/KWGNGRAANA.git
+cd KWGNGRAANA
+python3 -m pip install -r requirements.txt
 
-# 2. WAJIB diisi sebelum dipakai:
-# - SESSION_PASSWORD : minimal 32 karakter random
-#                      generate: openssl rand -base64 48
-# - GEMINI_API_KEY   : key dari https://aistudio.google.com/apikey
-#                      (bisa kosong; chatbot jalan rule-based & esai dinilai 0)
-# - DEFAULT_LECTURER_PASSWORD : ganti dari "kwgn2026"
+# 2. Salin & isi secrets (TIDAK akan ter-commit)
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+# Edit .streamlit/secrets.toml:
+#   - GEMINI_API_KEY (dari aistudio.google.com/apikey)
+#   - DEFAULT_LECTURER_PASSWORD (password kuat baru)
 
-# 3. Pasang dependensi
-npm install
+# 3. Inisialisasi DB + seed (43 mahasiswa, dosen, 10 soal, 1 latihan demo)
+python3 scripts/init_db.py
+python3 scripts/seed.py
 
-# 4. Inisialisasi database + seed (43 mahasiswa, dosen, 10 soal, 1 latihan demo)
-npm run db:reset
-
-# 5. Mode pengembangan
-npm run dev
-# Buka http://localhost:3000
-
-# 6. Mode produksi
-npm run build
-npm run start
+# 4. Jalankan aplikasi
+streamlit run streamlit_app.py
+# Buka http://localhost:8501
 ```
 
-## 🔐 Akun Default Pasca-Seed
+## 🔐 Akun Default
 
 | Peran | Username | Password |
 | --- | --- | --- |
-| Dosen | `dosen@kwgn.id` | nilai `DEFAULT_LECTURER_PASSWORD` di .env |
-| Mahasiswa | NIM (mis. `25104080001`) | sama dengan NIM (HARUS diganti) |
+| Dosen | `dosen@kwgn.id` | nilai `DEFAULT_LECTURER_PASSWORD` di secrets |
+| Mahasiswa | NIM (mis. `25104080001`) | sama dengan NIM |
 
-> ⚠️ **Wajib ganti password dosen** dari default segera setelah seed.
-> Mahasiswa diarahkan ke menu **Profil → Ganti Password** pada login pertama.
+> ⚠️ Mahasiswa & dosen **wajib ganti password** setelah login pertama
+> via menu **Profil → Ganti Password**.
 
 ## 🌐 Deployment
 
-### 🚀 Pilihan 1: Railway (rekomendasi · paling mudah)
+### 🥇 Streamlit Community Cloud (gratis)
 
-Railway punya **persistent disk** + auto-deploy dari GitHub + free tier.
-
-1. Sign-up di [railway.app](https://railway.app) (login dengan akun GitHub Anda)
-2. **New Project → Deploy from GitHub Repo → pilih `KWGNGRAANA`**
-3. Railway otomatis mendeteksi `Dockerfile` & `railway.toml`. Tunggu build pertama.
-4. Tab **Variables** — tambahkan environment ini:
+1. Push branch ini ke GitHub Anda (sudah).
+2. Buka [share.streamlit.io](https://share.streamlit.io) → login GitHub.
+3. **New app** → pilih repo `KWGNGRAANA`, branch `feat/streamlit`,
+   main file: `streamlit_app.py`.
+4. Klik **Advanced settings → Secrets** → tempel:
+   ```toml
+   DATABASE_PATH = "/mount/data/kwgn.db"
+   DEFAULT_LECTURER_EMAIL = "dosen@kwgn.id"
+   DEFAULT_LECTURER_NAME = "Dosen Kewarganegaraan"
+   DEFAULT_LECTURER_PASSWORD = "<password kuat>"
+   GEMINI_API_KEY = "<key dari aistudio.google.com>"
+   GEMINI_MODEL = "gemini-2.5-flash"
    ```
-   SESSION_PASSWORD=<hasil dari `openssl rand -base64 48`>
-   DEFAULT_LECTURER_PASSWORD=<password kuat baru>
-   GEMINI_API_KEY=<rotasi key di aistudio.google.com/apikey>
-   SEED_ON_START=1                  ← sekali saja saat first deploy
+5. **Deploy**. Tunggu build pertama ~3 menit.
+6. Pasca deploy pertama, Streamlit Cloud → **Manage app → Shell**, jalankan:
+   ```bash
+   python scripts/init_db.py && python scripts/seed.py
    ```
-5. Tab **Volumes → New Volume** → mount path `/app/data`, ukuran `1 GB`.
-6. **Deployments → Redeploy**. App live di domain `*.up.railway.app` ✨
-7. Setelah seed berhasil (cek log), set `SEED_ON_START=0` dan redeploy.
 
-Setiap `git push` ke `main` akan **auto-build & deploy** di Railway.
+> ⚠️ **Disk persistent di Streamlit Cloud**: file SQLite di-reset tiap
+> redeploy/restart container. Untuk produksi serius, ganti DB ke
+> **Turso libSQL** (kompatibel API).
 
-### 🐳 Pilihan 2: VPS / Docker (full kontrol)
-
-Untuk VPS (DigitalOcean, Hetzner, Lightsail) atau server kampus:
+### 🥈 VPS / Docker
 
 ```bash
-git clone https://github.com/saidul2017/KWGNGRAANA.git
+# Di server Anda:
+git clone -b feat/streamlit https://github.com/saidul2017/KWGNGRAANA.git
 cd KWGNGRAANA
+python3 -m pip install -r requirements.txt
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+nano .streamlit/secrets.toml  # isi GEMINI_API_KEY, password
+python3 scripts/init_db.py && python3 scripts/seed.py
 
-# Salin & isi env (TIDAK akan ter-commit)
-cp .env.example .env
-# Edit .env dengan nilai produksi:
-#   SESSION_PASSWORD=...   (openssl rand -base64 48)
-#   GEMINI_API_KEY=...
-#   DEFAULT_LECTURER_PASSWORD=...
-#   SEED_ON_START=1        ← sekali untuk seed pertama
+# Jalankan dengan systemd (atau pm2 / supervisor)
+streamlit run streamlit_app.py --server.port 8501 --server.headless true
 
-docker compose up -d --build
-
-# Cek log pertama
-docker compose logs -f app
-
-# Aplikasi tersedia di http://YOUR_SERVER:3000
-# Untuk HTTPS, taruh di belakang Nginx/Caddy/Traefik (lihat docs masing-masing)
-
-# Setelah seed sukses, ubah SEED_ON_START=0 di .env, lalu:
-docker compose up -d
+# Reverse proxy via Nginx/Caddy untuk HTTPS — lihat docs.streamlit.io
 ```
-
-**Update aplikasi:** `git pull && docker compose up -d --build`
-**Backup DB:** `docker compose exec app cp /app/data/kwgn.db /app/data/backup-$(date +%F).db`
-
-### ⚙️ Pilihan 3: Render (alternatif Railway)
-
-[render.com](https://render.com) baca `render.yaml` otomatis:
-
-1. Sign-up Render dengan GitHub
-2. Dashboard → **New → Blueprint** → connect repo
-3. Isi env yang ditandai `sync: false` saat prompt:
-   `SESSION_PASSWORD`, `DEFAULT_LECTURER_PASSWORD`, `GEMINI_API_KEY`
-4. Klik **Apply**. Render build & deploy otomatis.
-5. Pasca-live, tab **Shell** → jalankan sekali:
-   ```
-   node node_modules/tsx/dist/cli.mjs scripts/seed.ts
-   ```
-   untuk seed dosen + 43 mahasiswa + soal demo.
-
-> Render free tier **tidak punya disk persisten** — wajib pakai paket `starter` ($7/bln) untuk SQLite.
-
-### ⚠️ Tidak direkomendasikan: Vercel / Netlify
-
-SQLite file tidak persisten di serverless filesystem. Bila ngotot pakai Vercel:
-- Migrasi DB ke **Turso** (`@libsql/client` sudah kompatibel — ubah `DATABASE_PATH`
-  ke URL Turso seperti `libsql://your-db-xxx.turso.io?authToken=...`)
-- In-memory live store + rate-limit ganti ke **Upstash Redis**
-
-### 🔍 Health Check
-
-`GET /api/health` mengembalikan status DB & LLM. Cocok untuk:
-- Liveness probe Docker (sudah dikonfigurasi di `Dockerfile`)
-- Health check Railway/Render (sudah dikonfigurasi di config)
-- Uptime monitor eksternal: UptimeRobot, Better Stack, dsb.
 
 ## 🧠 Penilaian Otomatis
 
 ### Pilihan Ganda — Algoritma Kahoot
-
 ```
 skor = max_points × (1 − 0.5 × waktu_respon ÷ batas_waktu)
 ```
-
-Jawab cepat → mendekati `max_points`. Jawab di detik terakhir → ~50%.
-Jawab salah / waktu habis → `0`.
+Jawab cepat → mendekati `max_points`. Detik terakhir → ~50%. Salah → 0.
 
 ### Esai — AI Grading via Gemini
-
-1. Dosen mendefinisikan **rubrik** (poin kunci yang harus muncul dalam jawaban)
-2. Mahasiswa menjawab dengan teks (dengan validasi minimal kata)
-3. Gemini menilai berdasarkan rubrik → **skor 0–100%**, daftar poin
-   tertangkap & yang masih kurang, plus feedback edukatif
-4. Dosen bisa **override skor** di halaman *Tinjau Esai*; skor AI awal
-   tetap tersimpan sebagai jejak audit
-
-## 🔒 Catatan Keamanan
-
-- ✅ Cookie sesi `httpOnly`, `secure` di production, `sameSite=lax`, expire 8 jam
-- ✅ Password di-hash bcrypt cost 10
-- ✅ `correctIndex` MCQ tidak pernah dikirim ke client saat fase question
-- ✅ `requireUser()` guard di setiap endpoint API non-publik
-- ✅ Validasi Zod di semua POST/PATCH/PUT
-- ✅ Rate limit chatbot (30 pesan/menit/user) dan grading esai (10 esai/5 menit/user)
-- ✅ Timeout 30 detik untuk panggilan Gemini agar request tidak hang
-- ✅ Login pesan generik (tidak leak user enumeration)
-- ✅ Excel import dibatasi 500 baris & 5 MB
-- ✅ Schedule kuis (`starts_at`/`ends_at`) di-enforce server-side
+Dosen tetapkan **rubrik poin kunci** → Gemini menilai jawaban mahasiswa
+0–100% + feedback edukatif. Dosen dapat **override skor** (skor AI awal
+tetap tersimpan sebagai jejak audit).
 
 ## 🗂️ Struktur Direktori
 
 ```
 KWGNGRAANA/
-├── data/                    # File SQLite (gitignored)
+├── streamlit_app.py        # Entry: login + role-based navigation
+├── views/
+│   ├── profile.py          # Ganti password (shared lecturer & student)
+│   ├── lecturer/
+│   │   ├── home.py         # Ringkasan kelas
+│   │   ├── questions.py    # CRUD soal + import Excel
+│   │   ├── quizzes.py      # CRUD kuis (set status open/draft/closed)
+│   │   ├── groups.py       # Bagi mahasiswa ke kelompok
+│   │   ├── students.py     # Daftar 43 mahasiswa
+│   │   ├── results.py      # Leaderboard + ekspor Excel 5 sheet
+│   │   └── essays.py       # Tinjau esai, override skor
+│   └── student/
+│       ├── home.py
+│       ├── practice.py     # Latihan boleh diulang
+│       ├── quizzes.py      # Kuis & UAS (1x pengerjaan)
+│       ├── play.py         # Player Kahoot-style timer
+│       ├── chatbot.py      # KB + Gemini fallback
+│       └── results.py      # Riwayat nilai
+├── lib/
+│   ├── db.py               # SQLite wrapper
+│   ├── schema.py           # Skema SQL
+│   ├── auth.py             # bcrypt + session_state
+│   ├── llm.py              # Gemini REST wrapper
+│   ├── essay_grading.py    # AI grading rubrik
+│   ├── chatbot_rules.py    # KB PKn (22 entri rujukan resmi)
+│   ├── scoring.py          # Algoritma Kahoot
+│   ├── rate_limit.py       # Sliding window
+│   ├── students_data.py    # 43 mahasiswa
+│   └── seed_questions.py   # Soal awal
 ├── scripts/
-│   ├── init-db.ts           # Membuat tabel + migrasi idempoten
-│   └── seed.ts              # Mengisi data awal
-└── src/
-    ├── app/
-    │   ├── api/             # Route handler API
-    │   │   ├── health/      # Health check
-    │   │   ├── auth/        # login, logout, me, password
-    │   │   ├── questions/   # CRUD soal + import + template
-    │   │   ├── quizzes/     # CRUD kuis + start
-    │   │   ├── attempts/    # submit jawaban + finish
-    │   │   ├── live/        # Live Kahoot (create, join, next, ...)
-    │   │   ├── chatbot/     # Chatbot 2-layer
-    │   │   ├── answers/     # Override skor esai
-    │   │   ├── groups/      # Kelompok
-    │   │   └── lecturer/    # Excel export
-    │   ├── lecturer/        # Halaman dosen
-    │   ├── student/         # Halaman mahasiswa
-    │   ├── login/           # Halaman login
-    │   ├── error.tsx        # Custom error page
-    │   ├── not-found.tsx    # Custom 404
-    │   └── page.tsx         # Landing
-    ├── components/          # Komponen reusable
-    └── lib/
-        ├── db.ts            # Wrapper @libsql
-        ├── schema.ts        # Skema SQL
-        ├── session.ts       # iron-session config
-        ├── scoring.ts       # Algoritma Kahoot
-        ├── chatbot-rules.ts # KB PKn (rule-based)
-        ├── llm.ts           # Gemini wrapper
-        ├── essay-grading.ts # Auto-grading rubric
-        ├── live-store.ts    # In-memory state Live Kahoot
-        ├── rate-limit.ts    # Sliding window rate limiter
-        ├── students-data.ts # Daftar 43 mahasiswa
-        └── seed-questions.ts# Soal awal
+│   ├── init_db.py          # Buat tabel + migrasi idempoten
+│   └── seed.py             # Isi data awal
+├── .streamlit/
+│   ├── config.toml         # Tema warna
+│   └── secrets.toml.example
+└── requirements.txt
 ```
 
-## 🛣️ Roadmap
+## 🔒 Keamanan
 
-- [ ] Brute-force protection di login (rate limit per IP)
-- [ ] Migrasi ke Redis untuk live store agar bisa multi-instance
-- [ ] Anti-curang lanjutan (deteksi tab switch, fullscreen lock)
-- [ ] PWA (instalable di home screen mahasiswa)
-- [ ] Soal benar/salah (TF) di QuestionForm
-- [ ] Upload materi RPS untuk RAG chatbot
+- ✅ Password hash bcrypt cost 10
+- ✅ Login generic message (no user enumeration)
+- ✅ Rate limit chatbot 30 pesan/menit/user
+- ✅ Timeout 30s panggilan Gemini
+- ✅ Excel import dibatasi 500 baris & 5 MB
+- ✅ Validasi auth di awal setiap halaman (`require_login` / `require_role`)
+- ✅ Rubric/correctIndex tidak terlihat user saat fase question
 
 ## 📜 Catatan Akademik
 
 Aplikasi ini berorientasi pendidikan dan **tidak menggantikan dosen**.
 Setiap jawaban chatbot dan soal kuis menyertakan rujukan resmi (Pancasila,
-UUD 1945, UU No. 12 Tahun 2006, dll.) sehingga mahasiswa terbiasa berpikir
-konstitusional dan akademis.
+UUD 1945, UU No. 12 Tahun 2006, dll.).

@@ -1,0 +1,20 @@
+# Tema KWGN — palet warna gaya Kahoot
+[theme]
+primaryColor = "#4f46e5"           # brand-600
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor = "#0f172a"
+font = "sans serif"
+
+[server]
+headless = true
+port = 8501
+enableXsrfProtection = true
+maxUploadSize = 5
+
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = false           # Production-safe
+toolbarMode = "minimal"
