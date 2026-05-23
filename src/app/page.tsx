@@ -2,6 +2,11 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { redirect } from "next/navigation";
 
+// Halaman ini membaca cookie session via getCurrentUser() — wajib runtime.
+// Tanpa baris ini, Next.js mencoba mengevaluasi page saat `next build` dan
+// memunculkan log yang membingungkan (lihat juga route lain di repo ini).
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const user = await getCurrentUser();
   if (user) {

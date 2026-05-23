@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import Navbar from "@/components/Navbar";
 
+// Layout ini bergantung pada cookie session di setiap request → harus dynamic.
+export const dynamic = "force-dynamic";
+
 const NAV = [
   { href: "/student", label: "Beranda", icon: "🏠" },
   { href: "/student/live", label: "Live Kahoot", icon: "🎮" },

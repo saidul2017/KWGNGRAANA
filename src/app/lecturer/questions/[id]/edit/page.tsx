@@ -3,6 +3,9 @@ import { get } from "@/lib/db";
 import { rowToQuestion, type QuestionRow } from "@/lib/types";
 import QuestionForm from "../../QuestionForm";
 
+// Membaca DB untuk soal spesifik → wajib dievaluasi saat request, bukan build.
+export const dynamic = "force-dynamic";
+
 export default async function EditQuestionPage({
   params,
 }: {
