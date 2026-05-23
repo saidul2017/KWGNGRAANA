@@ -155,7 +155,7 @@ export async function GET(req: Request) {
             COALESCE(SUM(a.total_score), 0) AS total_score,
             COALESCE(ROUND(AVG(a.total_score), 0), 0) AS avg_score
      FROM groups g
-     LEFT JOIN attempts a ON a.group_id = g.id AND a.status='completed' ${filterSql.replace(/^AND/, "AND")}
+     LEFT JOIN attempts a ON a.group_id = g.id AND a.status='completed' ${filterSql}
      GROUP BY g.id, g.name
      ORDER BY avg_score DESC`,
     params

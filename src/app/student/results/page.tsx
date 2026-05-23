@@ -56,7 +56,6 @@ export default async function StudentResultsPage({
       ) : (
         <div className="card divide-y divide-slate-100 p-0">
           {attempts.map((a) => {
-            const max = 0; // tidak diketahui tanpa join, dihitung kasar dari ratio benar
             const pct =
               a.total_questions > 0
                 ? Math.round((a.total_correct / a.total_questions) * 100)

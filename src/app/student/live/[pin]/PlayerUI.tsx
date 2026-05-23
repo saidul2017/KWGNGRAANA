@@ -46,21 +46,27 @@ const SHAPES = ["▲", "◆", "●", "■", "★", "♦"];
 export default function PlayerUI({ pin, userName }: { pin: string; userName: string }) {
   const router = useRouter();
   const [view, setView] = useState<View | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "expired">("loading");
   const [submitting, setSubmitting] = useState(false);
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const lastQuestionRef = useRef<number | null>(null);
   const questionStartLocalRef = useRef<number>(Date.now());
 
-  // Polling 1s
+  // Polling 1s. Stop saat sesi expired (404) atau status final (turunkan ke 5s).
   useEffect(() => {
     let alive = true;
+    let id: ReturnType<typeof setInterval> | null = null;
+
     async function tick() {
       try {
         const res = await fetch(`/api/live/${pin}`, { cache: "no-store" });
         if (!alive) return;
-        if (!res.ok) {
-          setView(null);
+        if (res.status === 404) {
+          setLoadState("expired");
+          if (id) clearInterval(id);
           return;
         }
+        if (!res.ok) return; // transient, retry tick berikut
         const data = await res.json();
         const v = data.view as View;
         // Reset timer lokal saat soal berganti
@@ -71,15 +77,20 @@ export default function PlayerUI({ pin, userName }: { pin: string; userName: str
           }
         }
         setView(v);
+        setLoadState("ready");
+        if (v.status === "final" && id) {
+          clearInterval(id);
+          id = setInterval(tick, 5000);
+        }
       } catch {
         /* ignore */
       }
     }
     tick();
-    const id = setInterval(tick, 1000);
+    id = setInterval(tick, 1000);
     return () => {
       alive = false;
-      clearInterval(id);
+      if (id) clearInterval(id);
     };
   }, [pin]);
 
@@ -87,9 +98,10 @@ export default function PlayerUI({ pin, userName }: { pin: string; userName: str
   async function answer(idx: number) {
     if (!view?.question || submitting || view.myAnswered) return;
     setSubmitting(true);
+    setAnswerError(null);
     const responseMs = Date.now() - questionStartLocalRef.current;
     try {
-      await fetch(`/api/live/${pin}/answer`, {
+      const res = await fetch(`/api/live/${pin}/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,9 +110,39 @@ export default function PlayerUI({ pin, userName }: { pin: string; userName: str
           responseMs,
         }),
       });
+      if (!res.ok) {
+        // Pesan eksplisit kenapa jawaban ditolak (waktu habis, sudah dijawab,
+        // sesi mati). Tanpa ini player bingung kenapa skor 0.
+        const j = await res.json().catch(() => ({}));
+        setAnswerError(j.error || `Jawaban gagal terkirim (HTTP ${res.status})`);
+      }
+    } catch (e) {
+      setAnswerError(`Kesalahan jaringan: ${String(e)}`);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (loadState === "expired") {
+    return (
+      <div className="card text-center py-10 space-y-4 border-rose-200 bg-rose-50">
+        <div className="text-5xl">😕</div>
+        <h2 className="text-xl font-bold text-rose-700">Sesi Sudah Berakhir</h2>
+        <p className="text-sm text-slate-700 max-w-md mx-auto">
+          PIN <strong className="font-mono">{pin}</strong> sudah tidak aktif. Mungkin
+          dosen sudah menutup sesi atau koneksi server sempat putus.
+          Tanyakan ke dosen kalau sesi seharusnya masih jalan.
+        </p>
+        <div className="flex justify-center gap-2">
+          <button onClick={() => router.push("/student/live")} className="btn-primary">
+            ← Gabung Sesi Lain
+          </button>
+          <button onClick={() => router.push("/student")} className="btn-ghost">
+            Beranda
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!view) {
@@ -249,7 +291,13 @@ export default function PlayerUI({ pin, userName }: { pin: string; userName: str
         })}
       </div>
 
-      {view.status === "question" && view.myAnswered && (
+      {answerError && (
+        <div className="card bg-rose-50 border-rose-200 text-sm text-rose-700">
+          ⚠️ {answerError}
+        </div>
+      )}
+
+      {view.status === "question" && view.myAnswered && !answerError && (
         <div className="card bg-amber-50 border-amber-200 text-center">
           ✅ Jawaban Anda terkirim. Tunggu peserta lain & layar dosen.
         </div>

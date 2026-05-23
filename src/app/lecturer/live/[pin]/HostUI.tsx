@@ -60,32 +60,48 @@ export default function HostUI({
 }) {
   const router = useRouter();
   const [view, setView] = useState<View | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "expired">("loading");
   const [busy, setBusy] = useState(false);
   const [savedFinal, setSavedFinal] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const lastStatus = useRef<string | null>(null);
 
-  // Polling state setiap 1 detik
+  // Polling state. Berhenti otomatis saat sesi expired (404) atau status final.
   useEffect(() => {
     let alive = true;
+    let id: ReturnType<typeof setInterval> | null = null;
+
     async function tick() {
       try {
         const res = await fetch(`/api/live/${pin}`, { cache: "no-store" });
         if (!alive) return;
-        if (!res.ok) {
-          setView(null);
+        if (res.status === 404) {
+          // Sesi sudah hilang dari memori (mis. server restart, atau dosen lain
+          // sudah finalize). Polling sia-sia → stop.
+          setLoadState("expired");
+          if (id) clearInterval(id);
           return;
         }
+        if (!res.ok) return; // 401/500 transient — skip tick ini, coba lagi nanti
         const data = await res.json();
-        setView(data.view as View);
+        const v = data.view as View;
+        setView(v);
+        setLoadState("ready");
+        // Reduce frekuensi polling di status 'final' (sudah tidak berubah).
+        if (v.status === "final" && id) {
+          clearInterval(id);
+          id = setInterval(tick, 5000);
+        }
       } catch {
-        /* ignore network blip */
+        /* network blip — biarkan tick berikutnya retry */
       }
     }
     tick();
-    const id = setInterval(tick, 1000);
+    id = setInterval(tick, 1000);
     return () => {
       alive = false;
-      clearInterval(id);
+      if (id) clearInterval(id);
     };
   }, [pin]);
 
@@ -99,16 +115,59 @@ export default function HostUI({
 
   async function saveFinal() {
     if (savedFinal) return;
-    setSavedFinal(true);
-    await fetch(`/api/live/${pin}/finish`, { method: "POST" }).catch(() => null);
-    router.refresh();
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/live/${pin}/finish`, { method: "POST" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setSaveError(j.error || `Gagal menyimpan hasil (HTTP ${res.status}). Klik tombol di bawah untuk mencoba ulang.`);
+        return;
+      }
+      setSavedFinal(true);
+      router.refresh();
+    } catch (e) {
+      setSaveError(`Kesalahan jaringan: ${String(e)}. Klik tombol di bawah untuk mencoba ulang.`);
+    }
   }
 
   async function advance() {
     if (busy) return;
     setBusy(true);
-    await fetch(`/api/live/${pin}/next`, { method: "POST" });
-    setBusy(false);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/live/${pin}/next`, { method: "POST" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || `Gagal melanjutkan (HTTP ${res.status})`);
+      }
+    } catch (e) {
+      setActionError(`Kesalahan jaringan: ${String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Sesi sudah hilang dari memori → tampilkan banner jelas + tombol kembali.
+  if (loadState === "expired") {
+    return (
+      <div className="card text-center py-10 space-y-4 border-rose-200 bg-rose-50">
+        <div className="text-5xl">⚠️</div>
+        <h2 className="text-xl font-bold text-rose-700">Sesi Live Berakhir</h2>
+        <p className="text-sm text-slate-700 max-w-md mx-auto">
+          PIN <strong className="font-mono">{pin}</strong> sudah tidak aktif.
+          Sesi mungkin sudah selesai atau server di-restart.
+          Buat sesi baru kalau ingin menjalankan kuis lagi.
+        </p>
+        <div className="flex justify-center gap-2">
+          <button onClick={() => router.push("/lecturer/quizzes")} className="btn-primary">
+            ← Kembali ke Daftar Kuis
+          </button>
+          <button onClick={() => router.push("/lecturer/results")} className="btn-ghost">
+            Lihat Hasil Tersimpan
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!view) {
@@ -178,10 +237,18 @@ export default function HostUI({
         <div className="card text-center bg-gradient-to-br from-amber-50 to-rose-50">
           <h1 className="text-3xl font-extrabold">🏆 Hasil Akhir</h1>
           <p className="text-sm text-slate-600">{quizTitle}</p>
-          {savedFinal && (
+          {savedFinal && !saveError && (
             <p className="mt-2 text-xs text-emerald-700">
               ✅ Hasil telah disimpan ke riwayat nilai mahasiswa.
             </p>
+          )}
+          {saveError && (
+            <div className="mt-3 inline-flex flex-col items-center gap-2">
+              <p className="text-sm text-rose-700 max-w-md">{saveError}</p>
+              <button onClick={saveFinal} className="btn-primary bg-rose-600 hover:bg-rose-700 focus:ring-rose-500">
+                🔄 Coba Simpan Ulang
+              </button>
+            </div>
           )}
         </div>
         <div className="card p-0 overflow-x-auto">
@@ -332,6 +399,12 @@ export default function HostUI({
               </li>
             ))}
           </ol>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="card border-rose-200 bg-rose-50 text-sm text-rose-700">
+          ⚠️ {actionError}
         </div>
       )}
 

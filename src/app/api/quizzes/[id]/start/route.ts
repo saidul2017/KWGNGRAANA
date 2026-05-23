@@ -66,20 +66,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Kuis ini belum berisi soal." }, { status: 400 });
   }
 
-  let ordered = questions.map(rowToQuestion);
-  if (quiz.shuffle) {
-    // Seed unik per attempt+user agar jika resume urutan tetap sama.
-    const seed = (user.id * 1009 + quizId * 31 + (attempt?.id ?? Date.now())) | 0;
-    ordered = shuffle(ordered, seed);
-  }
-
+  // Insert attempt LEBIH DULU agar seed shuffle selalu deterministik antar resume.
+  // Sebelumnya: kalau attempt belum ada, seed pakai Date.now() — refresh = urutan
+  // baru = soal yang sama dianggap "sudah dijawab" oleh server → mahasiswa stuck.
   if (!attempt) {
     const r = await run(
       `INSERT INTO attempts (quiz_id, user_id, group_id, total_questions, status)
        VALUES (?, ?, ?, ?, 'in_progress')`,
-      [quizId, user.id, user.groupId ?? null, ordered.length]
+      [quizId, user.id, user.groupId ?? null, questions.length]
     );
-    attempt = { id: r.lastInsertRowid, total_questions: ordered.length };
+    attempt = { id: r.lastInsertRowid, total_questions: questions.length };
+  }
+
+  let ordered = questions.map(rowToQuestion);
+  if (quiz.shuffle) {
+    const seed = (user.id * 1009 + quizId * 31 + attempt.id * 7) | 0;
+    ordered = shuffle(ordered, seed);
   }
 
   // Jangan kirim correct_index ke klien.

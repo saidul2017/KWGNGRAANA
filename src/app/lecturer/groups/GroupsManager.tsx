@@ -48,7 +48,10 @@ export default function GroupsManager({
     if (!confirm("Hapus kelompok ini? Anggota akan dilepas dari kelompok.")) return;
     const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      alert("Gagal menghapus");
+      // Tampilkan pesan dari server (mis. "Kelompok masih dipakai di kuis aktif")
+      // alih-alih teks generik yang tidak informatif.
+      const j = await res.json().catch(() => ({}));
+      alert(j.error || `Gagal menghapus kelompok (HTTP ${res.status})`);
       return;
     }
     setGroups(groups.filter((g) => g.id !== id));
@@ -63,7 +66,8 @@ export default function GroupsManager({
       body: JSON.stringify({ groupId }),
     });
     if (!res.ok) {
-      alert("Gagal mengubah kelompok");
+      const j = await res.json().catch(() => ({}));
+      alert(j.error || `Gagal mengubah kelompok (HTTP ${res.status})`);
       return;
     }
     setStudents(students.map((s) => (s.id === studentId ? { ...s, group_id: groupId } : s)));

@@ -81,19 +81,23 @@ export default async function PlayPage({
     );
   }
 
-  let ordered = questions.map(rowToQuestion);
-  if (quiz.shuffle) {
-    const seed = (user.id * 1009 + quizId * 31 + (attempt?.id ?? Date.now())) | 0;
-    ordered = shuffle(ordered, seed);
-  }
-
+  // Insert attempt LEBIH DULU sebelum shuffle, supaya seed selalu berbasis attempt.id
+  // yang stabil. Sebelumnya seed pakai Date.now() saat attempt belum ada, lalu pakai
+  // attempt.id setelah refresh — bikin urutan soal berubah antar kunjungan dan
+  // mahasiswa stuck "soal sudah dijawab" karena server dapat questionId berbeda.
   if (!attempt) {
     const r = await run(
       `INSERT INTO attempts (quiz_id, user_id, group_id, total_questions, status)
        VALUES (?, ?, ?, ?, 'in_progress')`,
-      [quizId, user.id, user.groupId ?? null, ordered.length]
+      [quizId, user.id, user.groupId ?? null, questions.length]
     );
     attempt = { id: r.lastInsertRowid };
+  }
+
+  let ordered = questions.map(rowToQuestion);
+  if (quiz.shuffle) {
+    const seed = (user.id * 1009 + quizId * 31 + attempt.id * 7) | 0;
+    ordered = shuffle(ordered, seed);
   }
 
   const safeQuestions = ordered.map((q) => ({

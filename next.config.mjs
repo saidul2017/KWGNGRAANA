@@ -6,6 +6,9 @@ const nextConfig = {
   output: "standalone",
   experimental: {
     serverComponentsExternalPackages: ["@libsql/client"],
+    // Aktifkan src/instrumentation.ts agar validasi SESSION_PASSWORD jalan
+    // saat startup (fail-fast), bukan saat request pertama.
+    instrumentationHook: true,
   },
 };
 

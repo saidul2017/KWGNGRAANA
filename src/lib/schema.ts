@@ -76,6 +76,11 @@ CREATE TABLE IF NOT EXISTS attempts (
 );
 CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_attempts_quiz ON attempts(quiz_id);
+-- Cegah race-condition double-click "Mulai" / dua tab paralel: hanya boleh ada 1
+-- attempt 'in_progress' per (quiz_id, user_id). Attempt 'completed' tidak terdampak.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_one_inprogress
+  ON attempts(quiz_id, user_id)
+  WHERE status = 'in_progress';
 
 CREATE TABLE IF NOT EXISTS answers (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,

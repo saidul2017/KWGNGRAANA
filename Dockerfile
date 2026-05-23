@@ -65,9 +65,11 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 USER nextjs
 EXPOSE 3000
 
-# Healthcheck Docker — cek /api/health
+# Healthcheck Docker — cek /api/health.
+# Pakai ${PORT:-3000} karena Railway/Render override env PORT (sering 8080/10000).
+# Tanpa expansion ini, container ditandai unhealthy meski Next.js sehat.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:3000/api/health > /dev/null || exit 1
+  CMD wget -qO- "http://127.0.0.1:${PORT:-3000}/api/health" > /dev/null || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "server.js"]

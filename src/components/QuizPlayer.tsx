@@ -145,12 +145,30 @@ export default function QuizPlayer({
       setEssayText("");
       setResult(null);
       setPhase("playing");
-    } else {
-      setPhase("done");
-      await fetch(`/api/attempts/${attemptId}/finish`, { method: "POST" })
-        .then((r) => r.json())
-        .catch(() => null);
+      return;
     }
+    // Soal terakhir: panggil /finish dengan retry sederhana sebelum tampilkan "done".
+    // Sebelumnya `.catch(() => null)` membuang error → attempt in_progress
+    // tertinggal di DB, status "Belum selesai" muncul di /student/quizzes,
+    // dan untuk kuis non-practice mahasiswa terkunci tidak bisa apa-apa.
+    setPhase("done");
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(`/api/attempts/${attemptId}/finish`, { method: "POST" });
+        if (res.ok) return;
+        lastErr = `HTTP ${res.status}`;
+      } catch (e) {
+        lastErr = e;
+      }
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+    }
+    // eslint-disable-next-line no-console
+    console.error("[QuizPlayer] Gagal finish attempt setelah 3 retry:", lastErr);
+    alert(
+      "Hasil belum bisa disimpan ke server (jaringan bermasalah). " +
+        "Buka halaman 'Nilai Saya' untuk verifikasi, atau coba refresh halaman ini."
+    );
   }
 
   const progressPct = useMemo(

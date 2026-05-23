@@ -52,7 +52,11 @@ export async function POST(req: Request) {
 
   // Pesan generik untuk mencegah user enumeration. Selalu jalankan bcrypt.compare
   // dengan dummy hash bila user tidak ada agar timing relatif konstan.
-  const DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuv0123456789ABCDEFGHIJKLMNOPQRSTUV";
+  // PENTING: hash di bawah harus berformat bcrypt valid (60 char). Hash sebelumnya
+  // 61 char dan format salah — bcryptjs return false (bukan crash), tapi membingungkan
+  // dan bisa pecah di implementasi bcrypt lain. Hash ini hasil bcrypt.hashSync(random, 10)
+  // dari string random sekali generate — tidak akan pernah match password apa pun.
+  const DUMMY_HASH = "$2a$10$EXg9TWCWO6vpUBBWo2qAIuB2a/GQ1epB7V5AB242SLnKYzNwd/5aW";
   const hashToCheck = user?.password_hash ?? DUMMY_HASH;
   const ok = await bcrypt.compare(password, hashToCheck);
   if (!user || !ok) {
