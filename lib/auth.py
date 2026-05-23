@@ -76,10 +76,26 @@ def login(role: str, identifier: str, password: str) -> tuple[bool, str]:
 
 
 def logout() -> None:
-    """Bersihkan semua state user; biarkan state lain (mis. theme)."""
-    for k in ("user", "play_state", "live_state"):
-        if k in st.session_state:
+    """Bersihkan SEMUA state aplikasi sehingga user lain tidak menerima
+    sisa state user sebelumnya di browser yang sama.
+
+    State quiz player disimpan di kunci dinamis (`play_{quiz_id}`,
+    `active_quiz_id`, `edit_q_id`, `note_*`, `ovr_*`, dll.). Daftar nama
+    yang persis akan terus bertambah seiring fitur — lebih aman kosongkan
+    semua key kecuali yang aman seperti theme/widget Streamlit internal
+    (yang prefix-nya tidak kita kontrol).
+
+    Kita biarkan key Streamlit internal (mis. `_streamlit_*`) intact.
+    """
+    keys_to_delete = [
+        k for k in list(st.session_state.keys())
+        if not k.startswith("_") and not k.startswith("$$")
+    ]
+    for k in keys_to_delete:
+        try:
             del st.session_state[k]
+        except KeyError:
+            pass
 
 
 def current_user() -> Optional[dict]:
