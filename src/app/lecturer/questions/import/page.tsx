@@ -1,6 +1,9 @@
 import { requireUser } from "@/lib/session";
 import ImportForm from "./ImportForm";
 
+// requireUser membaca cookie session → harus dynamic.
+export const dynamic = "force-dynamic";
+
 export default async function ImportQuestionsPage() {
   await requireUser("lecturer");
   return (

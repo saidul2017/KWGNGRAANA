@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { all, get } from "@/lib/db";
 
+// Page ini melakukan query DB live di setiap kunjungan dosen → harus dynamic
+// agar Next.js tidak mencoba mengevaluasinya saat build (DB belum tentu ada).
+export const dynamic = "force-dynamic";
+
 export default async function LecturerHome() {
   const [studentCount, questionCount, quizCount, attemptCount] = await Promise.all([
     get<{ c: number }>(`SELECT COUNT(*) as c FROM users WHERE role='student'`),
