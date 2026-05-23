@@ -744,7 +744,7 @@ def page_profile(user: dict) -> None:
     st.subheader("🔐 Ganti Password")
     with st.form("change_password_lec"):
         old = st.text_input("Password lama", type="password")
-        new1 = st.text_input("Password baru (min 6 karakter)", type="password")
+        new1 = st.text_input("Password baru (min 8 karakter)", type="password")
         new2 = st.text_input("Ulangi password baru", type="password")
         submit = st.form_submit_button("Ubah Password", type="primary")
     if submit:
