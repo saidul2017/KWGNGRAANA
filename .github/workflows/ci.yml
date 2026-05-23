@@ -2,67 +2,30 @@ name: CI
 
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main, master, "**"]
   pull_request:
-    branches: [main]
 
 jobs:
-  build:
+  python-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      # Secret dummy untuk lulus validasi build (tidak dipakai di runtime CI).
-      SESSION_PASSWORD: ci_dummy_secret_minimum_32_chars_for_build_only_xxx
-      DATABASE_PATH: ./data/kwgn.db
-      DEFAULT_LECTURER_EMAIL: dosen@kwgn.id
-      DEFAULT_LECTURER_NAME: Dosen CI
-      DEFAULT_LECTURER_PASSWORD: ci_password_only
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install deps
-        run: npm ci --no-audit --no-fund
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Init DB (smoke test schema)
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
         run: |
-          mkdir -p data
-          npm run db:init
-
-      - name: Build Next.js
-        run: npm run build
-
-      - name: Verify build output
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+      - name: Syntax check (py_compile)
         run: |
-          test -f .next/standalone/server.js || (echo "Standalone server.js missing"; exit 1)
-          echo "✓ Build artifacts OK"
-
-  docker:
-    name: Docker image build
-    runs-on: ubuntu-latest
-    needs: build
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image (no push)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          tags: kwgn-learning-hub:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          python -m py_compile streamlit_app.py
+          find lib -name "*.py" -print0 | xargs -0 python -m py_compile
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Smoke import
+        run: |
+          # Pastikan modul lib bisa di-import tanpa error
+          python -c "from lib import db, schema, auth, scoring, ai, kb, seed; print('OK')"
