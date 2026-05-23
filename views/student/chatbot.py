@@ -2,7 +2,7 @@
 import streamlit as st
 
 from lib import auth, db
-from lib.chatbot_rules import KB, SUGGESTIONS, SYSTEM_INSTRUCTION, search_kb
+from lib.chatbot_rules import SUGGESTIONS, SYSTEM_INSTRUCTION, search_kb
 from lib.llm import generate_content, is_llm_enabled, llm_model
 from lib.rate_limit import rate_limit
 
