@@ -39,7 +39,7 @@ def upsert_lecturer() -> int:
         (LECTURER_EMAIL, LECTURER_NAME, hash_password(LECTURER_PASSWORD)),
     )
     new_id = db.last_insert_id()
-    print(f"[seed] Dosen dibuat: {LECTURER_EMAIL} (id={new_id})  password awal: {LECTURER_PASSWORD}")
+    print(f"[seed] Dosen dibuat: {LECTURER_EMAIL} (id={new_id})")
     return new_id
 
 
