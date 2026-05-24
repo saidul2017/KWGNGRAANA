@@ -17,12 +17,15 @@ import io
 import json
 import sqlite3
 from datetime import datetime
-
 import pandas as pd
 import streamlit as st
 
 from ..auth import change_password, hash_password, logout
-from ..db import all_, get_, run_, transaction
+from ..db import all_, db_path, get_, run_, transaction
+from ..excel import (
+    build_template,
+    import_questions_from_xlsx,
+)
 
 
 # ---------- Ringkasan ----------
@@ -184,9 +187,52 @@ def _question_form(initial: dict | None = None) -> dict | None:
     return None
 
 
+def _question_import_view(user: dict) -> None:
+    """Halaman import soal dari Excel."""
+    st.subheader("📥 Import Soal dari Excel")
+    if st.button("← Kembali ke daftar"):
+        st.session_state.pop("edit_q_id")
+        st.rerun()
+
+    st.markdown("**1. Unduh template dulu:**")
+    st.download_button(
+        "📄 Unduh Template Excel",
+        build_template(),
+        file_name="KWGN-Template-Soal.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    st.markdown(
+        "**2. Isi template** (sheet `Soal`), lalu upload di bawah. "
+        "Soal yang sudah ada (sama topik + teks) akan otomatis di-skip."
+    )
+    uploaded = st.file_uploader(
+        "Upload file .xlsx",
+        type=["xlsx"],
+        key="import_q_file",
+    )
+    if uploaded and st.button("🚀 Proses Import", type="primary"):
+        with st.spinner("Mengimpor soal..."):
+            result = import_questions_from_xlsx(uploaded.getvalue(), user["id"])
+        if result["inserted"] > 0:
+            st.success(f"✅ {result['inserted']} soal berhasil ditambahkan.")
+        if result["skipped"] > 0:
+            st.info(f"⏭️ {result['skipped']} soal di-skip (sudah ada di database).")
+        if result["errors"]:
+            st.error("Masalah ditemukan:")
+            for e in result["errors"][:10]:
+                st.write(f"- {e}")
+        if result["inserted"] > 0:
+            st.session_state.pop("edit_q_id")
+            st.rerun()
+
+
 def page_questions(user: dict) -> None:
     st.title("📝 Bank Soal")
     edit_id = st.session_state.get("edit_q_id")
+
+    if edit_id == "import":
+        _question_import_view(user)
+        return
 
     if edit_id == "new":
         st.subheader("+ Soal Baru")
@@ -249,9 +295,15 @@ def page_questions(user: dict) -> None:
         return
 
     # Daftar soal
-    if st.button("+ Tambah Soal Baru", type="primary"):
-        st.session_state["edit_q_id"] = "new"
-        st.rerun()
+    bc1, bc2 = st.columns(2)
+    with bc1:
+        if st.button("+ Tambah Soal Baru", type="primary", use_container_width=True):
+            st.session_state["edit_q_id"] = "new"
+            st.rerun()
+    with bc2:
+        if st.button("📥 Import dari Excel", use_container_width=True):
+            st.session_state["edit_q_id"] = "import"
+            st.rerun()
 
     c1, c2 = st.columns(2)
     with c1:
@@ -735,6 +787,35 @@ def page_essay_review(user: dict) -> None:
             )
 
 
+def _backup_restore_section() -> None:
+    """Bagian backup/restore DB di halaman Profil dosen."""
+    st.subheader("💾 Backup & Restore Database")
+    st.caption(
+        "Streamlit Cloud filesystem bisa reset sewaktu-waktu. "
+        "Unduh backup DB secara berkala supaya data tidak hilang."
+    )
+    p = db_path()
+    import os
+    if os.path.exists(p):
+        with open(p, "rb") as f:
+            st.download_button(
+                "⬇️ Unduh Backup DB (.db)",
+                f.read(),
+                file_name=f"kwgn-backup-{datetime.now().strftime('%Y%m%d')}.db",
+                mime="application/octet-stream",
+            )
+    else:
+        st.warning("File DB tidak ditemukan.")
+
+    st.markdown("**Restore:** upload file `.db` hasil backup sebelumnya.")
+    restore_file = st.file_uploader("Upload .db", type=["db"], key="restore_db")
+    if restore_file and st.button("🔄 Restore (timpa data saat ini!)", type="primary"):
+        with open(p, "wb") as f:
+            f.write(restore_file.getvalue())
+        st.success("Database di-restore. Silakan refresh halaman (F5).")
+        st.cache_resource.clear()
+
+
 # ---------- Profil ----------
 def page_profile(user: dict) -> None:
     st.title("👤 Profil Saya")
@@ -754,8 +835,8 @@ def page_profile(user: dict) -> None:
             ok, msg = change_password(user["id"], old, new1)
             (st.success if ok else st.error)(msg)
 
-
-# ---------- Render utama ----------
+    st.divider()
+    _backup_restore_section()
 def render(user: dict) -> None:
     with st.sidebar:
         st.markdown(f"### 👨‍🏫 {user['name']}")
