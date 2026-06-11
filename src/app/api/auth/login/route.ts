@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { getSession } from "@/lib/session";
 import { get } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 
 const Body = z.object({
   role: z.enum(["student", "lecturer"]),
@@ -36,6 +37,23 @@ export async function POST(req: Request) {
     );
   }
   const { role, identifier, password } = parsed.data;
+
+  // Rate limiting: max 5 login attempts per 15 minutes per IP
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+             req.headers.get("x-real-ip") ||
+             "unknown";
+  const rlKey = `login:${role}:${identifier}:${ip}`;
+  const rl = rateLimit(rlKey, 5, 15 * 60 * 1000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      {
+        error: `Terlalu banyak percobaan login. Tunggu ${Math.ceil(
+          rl.retryAfterMs / 1000
+        )} detik sebelum mencoba lagi.`,
+      },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+    );
+  }
 
   const user =
     role === "student"

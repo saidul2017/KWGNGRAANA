@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { get, run } from "@/lib/db";
 import { requireUser, AuthError } from "@/lib/session";
+import { rateLimit } from "@/lib/rate-limit";
 
 const Body = z.object({
   currentPassword: z.string().min(1, "Password lama wajib diisi"),
@@ -25,6 +26,20 @@ export async function PATCH(req: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.code }, { status: 401 });
     throw e;
   }
+
+  // Rate limiting: max 3 password change attempts per hour per user
+  const rl = rateLimit(`password:${user.id}`, 3, 60 * 60 * 1000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      {
+        error: `Terlalu banyak percobaan mengubah password. Tunggu ${Math.ceil(
+          rl.retryAfterMs / 1000
+        )} detik sebelum mencoba lagi.`,
+      },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+    );
+  }
+
   const json = await req.json().catch(() => null);
   const parsed = Body.safeParse(json);
   if (!parsed.success) {
